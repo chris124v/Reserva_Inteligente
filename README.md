@@ -91,3 +91,21 @@ Para borrarlo:
 ```
 docker-compose down -v
 ```
+
+--- 
+
+### Division
+
+#### Chris 
+
+* Carpeta Database = Conexiones
+* Carpeta Models = Esquemas BD
+* Carpeta Auth = Uso y conexion de JWT
+* Carpeta Routes = Implementacion EndPoints
+* Archivos de config y main
+
+#### Espi
+
+* Carpeta Schemas = Validacion de datos
+* Carpeta Services = Logica de Negocio
+* Carpeta Tests = Pruebas Unitarias
