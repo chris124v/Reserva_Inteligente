@@ -15,13 +15,16 @@ Por otro lado, existe la necesidad de garantizar la seguridad y el control de ac
 ## Technology Stack
 
 ### Backend y API
+
+- **Python**: Usar version fija 3.13.7 y un .venv para manejar todas las dependencias ahi.
+
 - **FastAPI**: Framework web moderno y de alto rendimiento para construir APIs REST en Python, con validación automática de datos y documentación interactiva.
 
 ### Autenticación y Seguridad
-- **AWS Cognito**: Servicio de autenticación y autorización completamente administrado que proporciona gestión centralizada de identidades, JWT y control de acceso basado en roles (RBAC). Ofrece un nivel gratuito de hasta 50,000 usuarios activos mensuales.
+- **AWS Cognito**: Servicio de autenticación y autorización completamente administrado que proporciona gestión centralizada de identidades, JWT y control de acceso basado en roles (RBAC). 
 
 ### Base de Datos
-- **PostgreSQL**: Sistema de gestión de bases de datos relacional robusto y confiable para almacenar usuarios, restaurantes, menús y reservas.
+- **PostgreSQL**: Sistema de gestión de bases de datos relacional robusto y confiable para almacenar usuarios, restaurantes, menús y reservas. Utilizamos SQLAlchemy para reducir complejidad a la hora de crear la BD.
 
 ### Contenedorización y Orquestación
 - **Docker**: Plataforma de contenedorización para empaquetar la aplicación y la base de datos de manera aislada y reproducible.
@@ -29,5 +32,62 @@ Por otro lado, existe la necesidad de garantizar la seguridad y el control de ac
 
 ### Testing
 - **Postman**: Herramienta para testing manual y automatizado de endpoints de la API, permitiendo validar funcionalidad, rendimiento y casos de uso.
-- **Pytest**: Framework de testing en Python para implementar pruebas unitarias e integración con cobertura de código mínimo del 90%.
+- **Pytest**: Framework de testing en Python para implementar pruebas unitarias e integración.
 
+---
+
+## Instructivo de Uso
+
+### Instalacion de Dependencias
+
+Requisitos Previos:
+
+* Docker instalado
+* Cuenta AWS 
+* Python 3.13.7
+* Git
+* VS Code 
+
+#### Paso 1: Github
+
+Clonar repo :
+
+``` 
+git clone https://github.com/chris124v/Reserva_Inteligente.git
+
+```
+
+#### Paso 2: Crear y Activar entorno virtual
+
+```
+python -m venv .venv
+
+.venv\Scripts\Activate.ps1
+
+```
+
+Se deberia ver (.venv) en su terminal
+
+#### Paso 3: Instalar Dependencias
+
+Update pip y ejecutar requirements.txt
+
+```
+pip install --upgrade pip
+
+python -m pip install -r app\requirements.txt
+```
+
+#### Paso 4: Inicializar el contenedor 
+
+Para ejecutarlo:
+
+```
+docker-compose up --build
+```
+
+Para borrarlo: 
+
+```
+docker-compose down -v
+```
