@@ -98,8 +98,8 @@ docker-compose down -v
 
 #### Chris 
 
-* Carpeta Database = Conexiones
-* Carpeta Models = Esquemas BD
+* Carpeta Database = Conexiones --- RRR
+* Carpeta Models = Esquemas BD --- RRR
 * Carpeta Auth = Uso y conexion de JWT
 * Carpeta Routes = Implementacion EndPoints
 * Archivos de config y main
