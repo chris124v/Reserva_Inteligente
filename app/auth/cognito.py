@@ -1,0 +1,111 @@
+import boto3
+import json
+
+import jwt
+from app.config import settings
+
+class CognitoClient:
+    def __init__(self):
+        # Inicializa el cliente de AWS Cognito
+        # Usa boto3 y las credenciales del .env
+
+        self.client = boto3.client('cognito-idp', region_name=settings.AWS_REGION)
+    
+    def register_user(self, email: str, password: str, nombre: str):
+        # Registra un usuario nuevo en Cognito
+
+        try:
+            response = self.client.admin_create_user(
+                UserPoolId=settings.COGNITO_USER_POOL_ID,
+                Username=email,
+                TemporaryPassword=password,
+                MessageAction='SUPPRESS'  # No envia email automático
+            )
+    
+            # Guarda el password permanente
+            self.client.admin_set_user_password(
+                UserPoolId=settings.COGNITO_USER_POOL_ID,
+                Username=email,
+                Password=password,
+                Permanent=True
+            )
+    
+            # Guarda el nombre como atributo
+            self.client.admin_update_user_attributes(
+                UserPoolId=settings.COGNITO_USER_POOL_ID,
+                Username=email,
+                UserAttributes=[
+                    {'Name': 'name', 'Value': nombre}
+                ]       
+            )
+    
+            return {"success": True, "message": "Usuario registrado"}
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+        
+        
+    
+    def authenticate_user(self, email: str, password: str):
+        # Autentica y devuelve el JWT
+
+        try:
+            response = self.client.admin_initiate_auth(
+                UserPoolId=settings.COGNITO_USER_POOL_ID,
+                ClientId=settings.COGNITO_CLIENT_ID,
+                AuthFlow='ADMIN_NO_SRP_AUTH',
+                AuthParameters={
+                    'USERNAME': email,
+                    'PASSWORD': password
+                }
+            )
+    
+            # Extrae los tokens
+            tokens = response['AuthenticationResult']
+    
+            return {
+                "success": True,
+                "access_token": tokens['AccessToken'], #Para recursos protegidos
+                "id_token": tokens['IdToken'], #Config del usuario
+                "refresh_token": tokens.get('RefreshToken') #Para renovar tokens
+            }
+
+        #Diversas excepciones comunes de autenticación
+        except self.client.exceptions.UserNotConfirmedException:
+            return {"success": False, "error": "Usuario no confirmado"}
+        except self.client.exceptions.NotAuthorizedException:
+            return {"success": False, "error": "Email o contraseña incorrecta"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+        
+    
+    def verify_token(self, token: str):
+        # Valida que el token sea legítimo
+        
+        try:
+            # Decodifica el token SIN verificar firma 
+            header = jwt.get_unverified_header(token)
+    
+            # Obtiene la clave pública de Cognito para verificar
+            response = self.client.get_signing_certificate(
+                UserPoolId=settings.COGNITO_USER_POOL_ID
+            )
+    
+            public_key = response['Certificate']
+    
+            # Verifica el token con la clave publica
+            payload = jwt.decode(
+                token,
+                public_key,
+                algorithms=['RS256']
+            )
+    
+            return {"success": True, "payload": payload}
+
+        except jwt.ExpiredSignatureError:
+            return {"success": False, "error": "Token expirado"}
+        except jwt.InvalidTokenError:
+            return {"success": False, "error": "Token inválido"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
