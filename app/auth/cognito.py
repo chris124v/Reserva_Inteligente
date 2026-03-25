@@ -8,6 +8,18 @@ class CognitoClient:
     def __init__(self):
         # Inicializa el cliente de AWS Cognito
         # Usa boto3 y las credenciales del .env
+        missing = []
+        if not settings.AWS_REGION:
+            missing.append("AWS_REGION o AWS_COGNITO_REGION")
+        if not settings.COGNITO_USER_POOL_ID:
+            missing.append("COGNITO_USER_POOL_ID o AWS_COGNITO_USER_POOL_ID")
+        if not settings.COGNITO_CLIENT_ID:
+            missing.append("COGNITO_CLIENT_ID o AWS_COGNITO_CLIENT_ID")
+
+        if missing:
+            raise ValueError(
+                "Faltan variables de entorno de Cognito: " + ", ".join(missing)
+            )
 
         self.client = boto3.client('cognito-idp', region_name=settings.AWS_REGION)
     

@@ -12,9 +12,10 @@ class Settings:
     DATABASE_NAME = os.getenv("DATABASE_NAME")
     
     # AWS Cognito
-    AWS_REGION = os.getenv("AWS_REGION")
-    COGNITO_USER_POOL_ID = os.getenv("COGNITO_USER_POOL_ID")
-    COGNITO_CLIENT_ID = os.getenv("COGNITO_CLIENT_ID")
+    # Support both legacy and explicit Cognito env var names.
+    AWS_REGION = os.getenv("AWS_REGION") or os.getenv("AWS_COGNITO_REGION")
+    COGNITO_USER_POOL_ID = os.getenv("COGNITO_USER_POOL_ID") or os.getenv("AWS_COGNITO_USER_POOL_ID")
+    COGNITO_CLIENT_ID = os.getenv("COGNITO_CLIENT_ID") or os.getenv("AWS_COGNITO_CLIENT_ID")
     AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
     AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
     
