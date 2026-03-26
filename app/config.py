@@ -18,6 +18,7 @@ class Settings:
     COGNITO_CLIENT_ID = os.getenv("COGNITO_CLIENT_ID") or os.getenv("AWS_COGNITO_CLIENT_ID")
     AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
     AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+    COGNITO_CLIENT_SECRET = os.getenv("COGNITO_CLIENT_SECRET")
     
     # API
     SECRET_KEY = os.getenv("SECRET_KEY", "tu-clave-secreta-aqui")

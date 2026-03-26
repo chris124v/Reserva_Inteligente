@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.auth.cognito import CognitoClient
 from app.config import settings
+from app.auth.cognito import CognitoClient, get_secret_hash
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 cognito_client = CognitoClient()
@@ -56,12 +57,20 @@ async def login(data: LoginRequest):
 async def refresh_token(data: RefreshRequest):
     
     try:
+        secret_hash = get_secret_hash(
+            data.refresh_token,  # Cognito usa el refresh_token como username aquí
+            settings.COGNITO_CLIENT_ID,
+            settings.COGNITO_CLIENT_SECRET
+        )
+
         response = cognito_client.client.admin_initiate_auth(
             UserPoolId=settings.COGNITO_USER_POOL_ID,
             ClientId=settings.COGNITO_CLIENT_ID,
             AuthFlow='REFRESH_TOKEN_AUTH',
             AuthParameters={
-                'REFRESH_TOKEN': data.refresh_token
+                'REFRESH_TOKEN': data.refresh_token,
+                'SECRET_HASH': secret_hash
+
             }
         )
         

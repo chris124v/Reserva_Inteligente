@@ -1,0 +1,410 @@
+{
+  "info": {
+    "name": "Reserva Inteligente de Restaurantes",
+    "description": "Colección completa para la API de reservas de restaurantes",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "id_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔐 Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"usuario@example.com\",\n  \"password\": \"Contraseña123!\",\n  \"nombre\": \"Juan Pérez\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            },
+            "description": "Registra un nuevo usuario en AWS Cognito"
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.access_token) {",
+                  "  pm.collectionVariables.set('access_token', res.access_token);",
+                  "  pm.collectionVariables.set('id_token', res.id_token);",
+                  "  pm.collectionVariables.set('refresh_token', res.refresh_token);",
+                  "  console.log('✅ Tokens guardados automáticamente');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"usuario@example.com\",\n  \"password\": \"Contraseña123!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Inicia sesión. Los tokens se guardan automáticamente en las variables de la colección."
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.access_token) {",
+                  "  pm.collectionVariables.set('access_token', res.access_token);",
+                  "  pm.collectionVariables.set('id_token', res.id_token);",
+                  "  console.log('✅ Access token renovado');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/refresh",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "refresh"]
+            },
+            "description": "Renueva el access_token usando el refresh_token"
+          }
+        }
+      ]
+    },
+    {
+      "name": "👤 Users",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/me",
+              "host": ["{{base_url}}"],
+              "path": ["users", "me"]
+            },
+            "description": "Obtiene el perfil del usuario autenticado"
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Nombre Actualizado\",\n  \"email\": \"nuevo@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/users/:id",
+              "host": ["{{base_url}}"],
+              "path": ["users", ":id"],
+              "variable": [{ "key": "id", "value": "1" }]
+            },
+            "description": "Actualiza información de un usuario"
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/:id",
+              "host": ["{{base_url}}"],
+              "path": ["users", ":id"],
+              "variable": [{ "key": "id", "value": "1" }]
+            },
+            "description": "Elimina un usuario"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🍽️ Restaurants",
+      "item": [
+        {
+          "name": "Create Restaurant",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"La Trattoria\",\n  \"descripcion\": \"Restaurante italiano auténtico\",\n  \"direccion\": \"Calle 5, San José\",\n  \"telefono\": \"2222-3333\",\n  \"email\": \"trattoria@example.com\",\n  \"hora_apertura\": \"11:00\",\n  \"hora_cierre\": \"22:00\",\n  \"total_mesas\": 15\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/restaurants",
+              "host": ["{{base_url}}"],
+              "path": ["restaurants"]
+            },
+            "description": "Registra un restaurante (solo administradores)"
+          }
+        },
+        {
+          "name": "List Restaurants",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/restaurants",
+              "host": ["{{base_url}}"],
+              "path": ["restaurants"]
+            },
+            "description": "Lista todos los restaurantes disponibles"
+          }
+        }
+      ]
+    },
+    {
+      "name": "📋 Menus",
+      "item": [
+        {
+          "name": "Create Menu Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Pasta Carbonara\",\n  \"descripcion\": \"Pasta con huevo, queso y panceta\",\n  \"precio\": 8500,\n  \"categoria\": \"Pastas\",\n  \"tiempo_preparacion\": 20,\n  \"disponible\": true,\n  \"restaurante_id\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/menus",
+              "host": ["{{base_url}}"],
+              "path": ["menus"]
+            },
+            "description": "Crea un nuevo plato en el menú"
+          }
+        },
+        {
+          "name": "Get Menu Item",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/menus/:id",
+              "host": ["{{base_url}}"],
+              "path": ["menus", ":id"],
+              "variable": [{ "key": "id", "value": "1" }]
+            },
+            "description": "Obtiene detalles de un plato específico"
+          }
+        },
+        {
+          "name": "Update Menu Item",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Pasta Carbonara Especial\",\n  \"precio\": 9500,\n  \"disponible\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/menus/:id",
+              "host": ["{{base_url}}"],
+              "path": ["menus", ":id"],
+              "variable": [{ "key": "id", "value": "1" }]
+            },
+            "description": "Actualiza un plato del menú"
+          }
+        },
+        {
+          "name": "Delete Menu Item",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/menus/:id",
+              "host": ["{{base_url}}"],
+              "path": ["menus", ":id"],
+              "variable": [{ "key": "id", "value": "1" }]
+            },
+            "description": "Elimina un plato del menú"
+          }
+        }
+      ]
+    },
+    {
+      "name": "📅 Reservations",
+      "item": [
+        {
+          "name": "Create Reservation",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurante_id\": 1,\n  \"fecha\": \"2026-04-10\",\n  \"hora\": \"19:00\",\n  \"cantidad_personas\": 2,\n  \"notas\": \"Mesa cerca de la ventana\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/reservations",
+              "host": ["{{base_url}}"],
+              "path": ["reservations"]
+            },
+            "description": "Crea una nueva reserva de mesa"
+          }
+        },
+        {
+          "name": "Cancel Reservation",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/reservations/:id",
+              "host": ["{{base_url}}"],
+              "path": ["reservations", ":id"],
+              "variable": [{ "key": "id", "value": "1" }]
+            },
+            "description": "Cancela una reserva existente"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🛒 Orders",
+      "item": [
+        {
+          "name": "Create Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurante_id\": 1,\n  \"items\": [\n    { \"menu_id\": 1, \"cantidad\": 2 },\n    { \"menu_id\": 3, \"cantidad\": 1 }\n  ],\n  \"tipo_entrega\": \"en_restaurante\",\n  \"notas\": \"Sin cebolla en la pasta\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orders",
+              "host": ["{{base_url}}"],
+              "path": ["orders"]
+            },
+            "description": "Realiza un pedido"
+          }
+        },
+        {
+          "name": "Get Order",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/:id",
+              "host": ["{{base_url}}"],
+              "path": ["orders", ":id"],
+              "variable": [{ "key": "id", "value": "1" }]
+            },
+            "description": "Obtiene detalles de un pedido"
+          }
+        }
+      ]
+    },
+    {
+      "name": "⚙️ Health",
+      "item": [
+        {
+          "name": "Root",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            }
+          }
+        },
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

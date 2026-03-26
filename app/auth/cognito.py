@@ -1,8 +1,19 @@
+import email
+import hmac
+import hashlib
+import base64
 import boto3
 import json
 
 import jwt
 from app.config import settings
+
+# Funcion para generar el secret hash requerido por Cognito
+def get_secret_hash(username, client_id, client_secret):
+    message = bytes(username + client_id, 'utf-8')
+    secret = bytes(client_secret, 'utf-8')
+    dig = hmac.new(secret, msg=message, digestmod=hashlib.sha256).digest()
+    return base64.b64encode(dig).decode()
 
 class CognitoClient:
     def __init__(self):
@@ -24,6 +35,7 @@ class CognitoClient:
         self.client = boto3.client('cognito-idp', region_name=settings.AWS_REGION)
     
     def register_user(self, email: str, password: str, nombre: str):
+        
         # Registra un usuario nuevo en Cognito
 
         try:
@@ -32,6 +44,7 @@ class CognitoClient:
                 Username=email,
                 TemporaryPassword=password,
                 MessageAction='SUPPRESS'  # No envia email automático
+    
             )
     
             # Guarda el password permanente
@@ -39,16 +52,16 @@ class CognitoClient:
                 UserPoolId=settings.COGNITO_USER_POOL_ID,
                 Username=email,
                 Password=password,
-                Permanent=True
+                Permanent=True,
             )
-    
-            # Guarda el nombre como atributo
+
             self.client.admin_update_user_attributes(
                 UserPoolId=settings.COGNITO_USER_POOL_ID,
                 Username=email,
                 UserAttributes=[
+                    {'Name': 'email_verified', 'Value': 'true'},
                     {'Name': 'name', 'Value': nombre}
-                ]       
+                ]
             )
     
             return {"success": True, "message": "Usuario registrado"}
@@ -61,6 +74,12 @@ class CognitoClient:
     def authenticate_user(self, email: str, password: str):
         # Autentica y devuelve el JWT
 
+        secret_hash = get_secret_hash(
+            email, 
+            settings.COGNITO_CLIENT_ID,
+            settings.COGNITO_CLIENT_SECRET
+        )  
+
         try:
             response = self.client.admin_initiate_auth(
                 UserPoolId=settings.COGNITO_USER_POOL_ID,
@@ -68,7 +87,9 @@ class CognitoClient:
                 AuthFlow='ADMIN_NO_SRP_AUTH',
                 AuthParameters={
                     'USERNAME': email,
-                    'PASSWORD': password
+                    'PASSWORD': password,
+                    'SECRET_HASH': secret_hash
+
                 }
             )
     
