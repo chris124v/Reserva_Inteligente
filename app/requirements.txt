@@ -1,11 +1,11 @@
-fastapi==0.104.1
-uvicorn==0.24.0
-sqlalchemy==2.0.36
-psycopg2-binary==2.9.11
-python-dotenv==1.0.0
-pydantic==2.12.0
-pytest==7.4.3
-pytest-cov==4.1.0
-boto3==1.29.7
-PyJWT==2.10.1
-requests==2.31.0
+fastapi==0.104.1 #Framework web para la API REST
+uvicorn==0.24.0 # Servidor ASGI para ejecutar la aplicación FastAPI
+sqlalchemy==2.0.36 # ORM para interactuar con la base de datos PostgreSQL
+psycopg2-binary==2.9.11 # Adaptador PostgreSQL para Python un driver para SQLAlchemy
+python-dotenv==1.0.0 # Carga variables de entorno desde un archivo .env
+pydantic==2.12.0 # Validación de datos
+pytest==7.4.3 # Framework de pruebas para Python osea testing unitario
+pytest-cov==4.1.0 # Plugin de pytest para medir la cobertura de código
+boto3==1.29.7 # SDK de AWS para Python, necesario para interactuar con AWS Cognito
+PyJWT==2.10.1 # Biblioteca para trabajar con JSON Web Tokens (JWT), utilizada para la autenticación
+requests==2.31.0 # Biblioteca para hacer solicitudes HTTP, útil para pruebas y para interactuar con servicios externos como AWS Cognito
