@@ -7,7 +7,7 @@
   "variable": [
     {
       "key": "base_url",
-      "value": "http://localhost:8000",
+      "value": "http://127.0.0.1:8000",
       "type": "string"
     },
     {
@@ -28,7 +28,7 @@
   ],
   "item": [
     {
-      "name": "🔐 Auth",
+      "name": " Auth",
       "item": [
         {
           "name": "Register",
@@ -61,7 +61,7 @@
                   "  pm.collectionVariables.set('access_token', res.access_token);",
                   "  pm.collectionVariables.set('id_token', res.id_token);",
                   "  pm.collectionVariables.set('refresh_token', res.refresh_token);",
-                  "  console.log('✅ Tokens guardados automáticamente');",
+                  "  console.log(' Tokens guardados automáticamente');",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -96,7 +96,7 @@
                   "if (res.access_token) {",
                   "  pm.collectionVariables.set('access_token', res.access_token);",
                   "  pm.collectionVariables.set('id_token', res.id_token);",
-                  "  console.log('✅ Access token renovado');",
+                  "  console.log('Access token renovado');",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -110,7 +110,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\",\n  \"email\": \"usuario@example.com\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/auth/refresh",
@@ -123,7 +123,7 @@
       ]
     },
     {
-      "name": "👤 Users",
+      "name": "Users",
       "item": [
         {
           "name": "Get My Profile",
@@ -180,7 +180,7 @@
       ]
     },
     {
-      "name": "🍽️ Restaurants",
+      "name": "Restaurants",
       "item": [
         {
           "name": "Create Restaurant",
@@ -220,7 +220,7 @@
       ]
     },
     {
-      "name": "📋 Menus",
+      "name": "Menus",
       "item": [
         {
           "name": "Create Menu Item",
@@ -298,7 +298,7 @@
       ]
     },
     {
-      "name": "📅 Reservations",
+      "name": "Reservations",
       "item": [
         {
           "name": "Create Reservation",
@@ -339,7 +339,7 @@
       ]
     },
     {
-      "name": "🛒 Orders",
+      "name": "Orders",
       "item": [
         {
           "name": "Create Order",
@@ -380,7 +380,7 @@
       ]
     },
     {
-      "name": "⚙️ Health",
+      "name": "Health",
       "item": [
         {
           "name": "Root",

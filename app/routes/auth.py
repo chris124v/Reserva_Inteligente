@@ -19,6 +19,7 @@ class LoginRequest(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+    email: str
 
 
 # Endpoints de autenticación
@@ -52,13 +53,24 @@ async def login(data: LoginRequest):
         raise HTTPException(status_code=401, detail=result["error"])
     return result
 
-#Refresca el token usando el refresh token
+#Refresca el token usando el usuario y el refresh token
 @router.post("/refresh")
 async def refresh_token(data: RefreshRequest):
     
     try:
+        # Cognito requiere el sub/username para el SECRET_HASH en refresh
+        # Primero obtenemos el username real desde Cognito
+
+        user_response = cognito_client.client.admin_get_user(
+            UserPoolId=settings.COGNITO_USER_POOL_ID,
+            Username=data.email
+        )
+
+        # El Username en Cognito es el sub (UUID)
+        username = user_response['Username']
+        
         secret_hash = get_secret_hash(
-            data.refresh_token,  # Cognito usa el refresh_token como username aquí
+            username,  # Cognito usa el username como identifier en esta parte
             settings.COGNITO_CLIENT_ID,
             settings.COGNITO_CLIENT_SECRET
         )
