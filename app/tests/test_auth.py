@@ -7,10 +7,7 @@ from unittest.mock import MagicMock, patch
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
  
- 
-# ─────────────────────────────────────────────
 # FIXTURES
-# ─────────────────────────────────────────────
  
 @pytest.fixture(autouse=True)
 def mock_settings():
@@ -45,9 +42,8 @@ def api():
             return TestClient(app)
  
  
-# ─────────────────────────────────────────────
+
 # get_secret_hash
-# ─────────────────────────────────────────────
  
 def test_secret_hash_es_deterministico():
     from app.auth.cognito import get_secret_hash
@@ -58,9 +54,7 @@ def test_secret_hash_diferente_por_usuario():
     assert get_secret_hash("user1", "b", "c") != get_secret_hash("user2", "b", "c")
  
  
-# ─────────────────────────────────────────────
 # register_user
-# ─────────────────────────────────────────────
  
 def test_register_exitoso(cognito):
     cognito.client.admin_create_user.return_value = {}
@@ -78,9 +72,8 @@ def test_register_falla_si_usuario_existe(cognito):
     assert "error" in result
  
  
-# ─────────────────────────────────────────────
 # authenticate_user
-# ─────────────────────────────────────────────
+
  
 def test_login_exitoso(cognito):
     cognito.client.admin_initiate_auth.return_value = {
@@ -104,9 +97,7 @@ def test_login_password_incorrecta(cognito):
     assert result["success"] is False
  
  
-# ─────────────────────────────────────────────
 # verify_token
-# ─────────────────────────────────────────────
  
 def test_verify_token_valido(cognito):
     with patch("app.auth.cognito.jwt.get_unverified_header", return_value={"kid": "k1"}), \
@@ -125,9 +116,7 @@ def test_verify_token_expirado(cognito):
     assert "expirado" in result["error"]
  
  
-# ─────────────────────────────────────────────
 # Middleware
-# ─────────────────────────────────────────────
  
 @pytest.mark.asyncio
 async def test_middleware_sin_token():
@@ -149,9 +138,7 @@ async def test_middleware_token_valido():
     assert result["sub"] == "123"
  
  
-# ─────────────────────────────────────────────
 # Endpoints
-# ─────────────────────────────────────────────
  
 def test_endpoint_register(api):
     with patch("app.routes.auth.cognito_client") as mock:
