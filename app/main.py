@@ -1,6 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes.auth import router as auth_router
+from app.routes.users import router as users_router
+from app.routes.restaurants import router as restaurants_router
+from app.routes.menus import router as menus_router
+from app.routes.reservations import router as reservations_router
+from app.routes.orders import router as orders_router
 from app.config import settings
 
 app = FastAPI(
@@ -9,7 +14,6 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS - Permite requests desde el frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  
@@ -18,8 +22,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Incluye el router de auth
 app.include_router(auth_router)
+app.include_router(users_router)
+app.include_router(restaurants_router)
+app.include_router(menus_router)
+app.include_router(reservations_router)
+app.include_router(orders_router)
 
 @app.get("/")
 async def root():

@@ -1,10 +1,8 @@
 from fastapi import Request, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthCredentials
 import jwt
 from app.auth.cognito import CognitoClient
 from app.config import settings
 
-security = HTTPBearer()
 cognito_client = CognitoClient()
 
 # Middleware para verificar JWT en cada solicitud

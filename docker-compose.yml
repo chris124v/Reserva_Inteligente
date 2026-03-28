@@ -46,6 +46,7 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       ENVIRONMENT: ${ENVIRONMENT}
+      PYTHONPATH: /code
     ports:
       - "8000:8000"
     depends_on:
@@ -53,7 +54,7 @@ services:
         condition: service_healthy
     volumes:
       # Para desarrollo hot-reload
-      - ./app:/app
+      - .:/code
     networks:
       - restaurantes_network
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
