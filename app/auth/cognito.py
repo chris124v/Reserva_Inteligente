@@ -33,6 +33,13 @@ class CognitoClient:
             )
 
         self.client = boto3.client('cognito-idp', region_name=settings.AWS_REGION)
+        self.issuer = (
+            f"https://cognito-idp.{settings.AWS_REGION}.amazonaws.com/"
+            f"{settings.COGNITO_USER_POOL_ID}"
+        )
+        self.jwks_client = jwt.PyJWKClient(
+            f"{self.issuer}/.well-known/jwks.json"
+        )
     
     def register_user(self, email: str, password: str, nombre: str):
         
@@ -117,27 +124,33 @@ class CognitoClient:
         # Valida que el token sea legítimo
         
         try:
-            # Decodifica el token SIN verificar firma 
-            header = jwt.get_unverified_header(token)
-    
-            # Obtiene la clave pública de Cognito para verificar
-            response = self.client.get_signing_certificate(
-                UserPoolId=settings.COGNITO_USER_POOL_ID
-            )
-    
-            public_key = response['Certificate']
-    
-            # Verifica el token con la clave publica
+            # Obtiene la llave pública correcta desde JWKS de Cognito
+            signing_key = self.jwks_client.get_signing_key_from_jwt(token).key
+
+            # Verifica firma e issuer
             payload = jwt.decode(
                 token,
-                public_key,
-                algorithms=['RS256']
+                signing_key,
+                algorithms=['RS256'],
+                issuer=self.issuer,
+                options={"verify_aud": False}
             )
+
+            # Validación explícita para access token de este app client
+            token_use = payload.get("token_use")
+            if token_use != "access":
+                return {"success": False, "error": "Token no es access token"}
+
+            client_id = payload.get("client_id") or payload.get("aud")
+            if client_id != settings.COGNITO_CLIENT_ID:
+                return {"success": False, "error": "Token no pertenece a este cliente"}
     
             return {"success": True, "payload": payload}
 
         except jwt.ExpiredSignatureError:
             return {"success": False, "error": "Token expirado"}
+        except jwt.InvalidIssuerError:
+            return {"success": False, "error": "Issuer de token invalido"}
         except jwt.InvalidTokenError:
             return {"success": False, "error": "Token inválido"}
         except Exception as e:

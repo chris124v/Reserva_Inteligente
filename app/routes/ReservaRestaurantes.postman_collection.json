@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Reserva Inteligente de Restaurantes",
-    "description": "Colección completa para la API de reservas de restaurantes",
+    "description": "Coleccion completa para la API de reservas de restaurantes",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -16,37 +16,70 @@
       "type": "string"
     },
     {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string"
+    },
+    {
       "key": "id_token",
       "value": "",
       "type": "string"
     },
     {
-      "key": "refresh_token",
-      "value": "",
+      "key": "user_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "restaurant_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "menu_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "reservation_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "order_id",
+      "value": "1",
       "type": "string"
     }
   ],
   "item": [
     {
-      "name": " Auth",
+      "name": "Auth",
       "item": [
         {
           "name": "Register",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"usuario@example.com\",\n  \"password\": \"Contraseña123!\",\n  \"nombre\": \"Juan Pérez\"\n}"
+              "raw": "{\n  \"email\": \"usuario@example.com\",\n  \"password\": \"Contrasena123!\",\n  \"nombre\": \"Juan Perez\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/auth/register",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "register"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
             },
-            "description": "Registra un nuevo usuario en AWS Cognito"
+            "description": "Registra un usuario en Cognito."
           }
         },
         {
@@ -55,34 +88,45 @@
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
                   "const res = pm.response.json();",
                   "if (res.access_token) {",
                   "  pm.collectionVariables.set('access_token', res.access_token);",
-                  "  pm.collectionVariables.set('id_token', res.id_token);",
+                  "}",
+                  "if (res.refresh_token) {",
                   "  pm.collectionVariables.set('refresh_token', res.refresh_token);",
-                  "  console.log(' Tokens guardados automáticamente');",
+                  "}",
+                  "if (res.id_token) {",
+                  "  pm.collectionVariables.set('id_token', res.id_token);",
                   "}"
-                ],
-                "type": "text/javascript"
+                ]
               }
             }
           ],
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"usuario@example.com\",\n  \"password\": \"Contraseña123!\"\n}"
+              "raw": "{\n  \"email\": \"usuario@example.com\",\n  \"password\": \"Contrasena123!\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/auth/login",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "login"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
             },
-            "description": "Inicia sesión. Los tokens se guardan automáticamente en las variables de la colección."
+            "description": "Inicia sesion y guarda tokens automaticamente."
           }
         },
         {
@@ -91,22 +135,26 @@
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
                   "const res = pm.response.json();",
                   "if (res.access_token) {",
                   "  pm.collectionVariables.set('access_token', res.access_token);",
+                  "}",
+                  "if (res.id_token) {",
                   "  pm.collectionVariables.set('id_token', res.id_token);",
-                  "  console.log('Access token renovado');",
                   "}"
-                ],
-                "type": "text/javascript"
+                ]
               }
             }
           ],
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -114,10 +162,15 @@
             },
             "url": {
               "raw": "{{base_url}}/auth/refresh",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "refresh"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
             },
-            "description": "Renueva el access_token usando el refresh_token"
+            "description": "Renueva el access token usando refresh token."
           }
         }
       ]
@@ -126,18 +179,99 @@
       "name": "Users",
       "item": [
         {
+          "name": "Create User (Local DB)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"usuario@example.com\",\n  \"nombre\": \"Juan Perez\",\n  \"password\": \"Contrasena123!\",\n  \"rol\": \"CLIENTE\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/users/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                ""
+              ]
+            }
+          }
+        },
+        {
           "name": "Get My Profile",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
             ],
             "url": {
               "raw": "{{base_url}}/users/me",
-              "host": ["{{base_url}}"],
-              "path": ["users", "me"]
-            },
-            "description": "Obtiene el perfil del usuario autenticado"
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/?limit=10&skip=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "skip",
+                  "value": "0"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get User By ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/users/{{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "{{user_id}}"
+              ]
+            }
           }
         },
         {
@@ -145,20 +279,29 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"Nombre Actualizado\",\n  \"email\": \"nuevo@example.com\"\n}"
+              "raw": "{\n  \"nombre\": \"Nombre Actualizado\",\n  \"email\": \"nuevo@example.com\",\n  \"activo\": true\n}"
             },
             "url": {
-              "raw": "{{base_url}}/users/:id",
-              "host": ["{{base_url}}"],
-              "path": ["users", ":id"],
-              "variable": [{ "key": "id", "value": "1" }]
-            },
-            "description": "Actualiza información de un usuario"
+              "raw": "{{base_url}}/users/{{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "{{user_id}}"
+              ]
+            }
           }
         },
         {
@@ -166,15 +309,44 @@
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
             ],
             "url": {
-              "raw": "{{base_url}}/users/:id",
-              "host": ["{{base_url}}"],
-              "path": ["users", ":id"],
-              "variable": [{ "key": "id", "value": "1" }]
-            },
-            "description": "Elimina un usuario"
+              "raw": "{{base_url}}/users/{{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "{{user_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Activate User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/{{user_id}}/activate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "{{user_id}}",
+                "activate"
+              ]
+            }
           }
         }
       ]
@@ -187,34 +359,156 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"La Trattoria\",\n  \"descripcion\": \"Restaurante italiano auténtico\",\n  \"direccion\": \"Calle 5, San José\",\n  \"telefono\": \"2222-3333\",\n  \"email\": \"trattoria@example.com\",\n  \"hora_apertura\": \"11:00\",\n  \"hora_cierre\": \"22:00\",\n  \"total_mesas\": 15\n}"
+              "raw": "{\n  \"nombre\": \"La Trattoria\",\n  \"descripcion\": \"Restaurante italiano\",\n  \"direccion\": \"Calle 5, San Jose\",\n  \"telefono\": \"2222-3333\",\n  \"email\": \"trattoria@example.com\",\n  \"hora_apertura\": \"11:00\",\n  \"hora_cierre\": \"22:00\",\n  \"total_mesas\": 15\n}"
             },
             "url": {
-              "raw": "{{base_url}}/restaurants",
-              "host": ["{{base_url}}"],
-              "path": ["restaurants"]
-            },
-            "description": "Registra un restaurante (solo administradores)"
+              "raw": "{{base_url}}/restaurants/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "restaurants",
+                ""
+              ]
+            }
           }
         },
         {
           "name": "List Restaurants",
           "request": {
             "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/restaurants/?limit=10&skip=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "restaurants",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "skip",
+                  "value": "0"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Restaurant By ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/restaurants/{{restaurant_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "restaurants",
+                "{{restaurant_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List My Restaurants",
+          "request": {
+            "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
             ],
             "url": {
-              "raw": "{{base_url}}/restaurants",
-              "host": ["{{base_url}}"],
-              "path": ["restaurants"]
+              "raw": "{{base_url}}/restaurants/admin/mis-restaurantes?limit=10&skip=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "restaurants",
+                "admin",
+                "mis-restaurantes"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "skip",
+                  "value": "0"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Restaurant",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"La Trattoria Renovada\",\n  \"telefono\": \"2222-9999\"\n}"
             },
-            "description": "Lista todos los restaurantes disponibles"
+            "url": {
+              "raw": "{{base_url}}/restaurants/{{restaurant_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "restaurants",
+                "{{restaurant_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Restaurant",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/restaurants/{{restaurant_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "restaurants",
+                "{{restaurant_id}}"
+              ]
+            }
           }
         }
       ]
@@ -223,76 +517,156 @@
       "name": "Menus",
       "item": [
         {
-          "name": "Create Menu Item",
+          "name": "List Menus",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/menus/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "menus",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Menus By Restaurante (query)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/menus/?restaurante_id={{restaurant_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "menus",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "restaurante_id",
+                  "value": "{{restaurant_id}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Menus By Restaurante (path)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/menus/restaurante/{{restaurant_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "menus",
+                "restaurante",
+                "{{restaurant_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Menu By ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/menus/{{menu_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "menus",
+                "{{menu_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Menu",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"Pasta Carbonara\",\n  \"descripcion\": \"Pasta con huevo, queso y panceta\",\n  \"precio\": 8500,\n  \"categoria\": \"Pastas\",\n  \"tiempo_preparacion\": 20,\n  \"disponible\": true,\n  \"restaurante_id\": 1\n}"
+              "raw": "{\n  \"nombre\": \"Pasta Carbonara\",\n  \"descripcion\": \"Pasta con huevo, queso y panceta\",\n  \"precio\": 8500,\n  \"categoria\": \"Pastas\",\n  \"tiempo_preparacion\": 20,\n  \"disponible\": true,\n  \"restaurante_id\": {{restaurant_id}}\n}"
             },
             "url": {
-              "raw": "{{base_url}}/menus",
-              "host": ["{{base_url}}"],
-              "path": ["menus"]
-            },
-            "description": "Crea un nuevo plato en el menú"
+              "raw": "{{base_url}}/menus/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "menus",
+                ""
+              ]
+            }
           }
         },
         {
-          "name": "Get Menu Item",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
-            ],
-            "url": {
-              "raw": "{{base_url}}/menus/:id",
-              "host": ["{{base_url}}"],
-              "path": ["menus", ":id"],
-              "variable": [{ "key": "id", "value": "1" }]
-            },
-            "description": "Obtiene detalles de un plato específico"
-          }
-        },
-        {
-          "name": "Update Menu Item",
+          "name": "Update Menu",
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"Pasta Carbonara Especial\",\n  \"precio\": 9500,\n  \"disponible\": true\n}"
+              "raw": "{\n  \"nombre\": \"Pasta Carbonara Especial\",\n  \"precio\": 9200,\n  \"disponible\": true\n}"
             },
             "url": {
-              "raw": "{{base_url}}/menus/:id",
-              "host": ["{{base_url}}"],
-              "path": ["menus", ":id"],
-              "variable": [{ "key": "id", "value": "1" }]
-            },
-            "description": "Actualiza un plato del menú"
+              "raw": "{{base_url}}/menus/{{menu_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "menus",
+                "{{menu_id}}"
+              ]
+            }
           }
         },
         {
-          "name": "Delete Menu Item",
+          "name": "Delete Menu",
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
             ],
             "url": {
-              "raw": "{{base_url}}/menus/:id",
-              "host": ["{{base_url}}"],
-              "path": ["menus", ":id"],
-              "variable": [{ "key": "id", "value": "1" }]
-            },
-            "description": "Elimina un plato del menú"
+              "raw": "{{base_url}}/menus/{{menu_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "menus",
+                "{{menu_id}}"
+              ]
+            }
           }
         }
       ]
@@ -305,19 +679,113 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"restaurante_id\": 1,\n  \"fecha\": \"2026-04-10\",\n  \"hora\": \"19:00\",\n  \"cantidad_personas\": 2,\n  \"notas\": \"Mesa cerca de la ventana\"\n}"
+              "raw": "{\n  \"restaurante_id\": {{restaurant_id}},\n  \"fecha\": \"2026-04-10\",\n  \"hora\": \"19:00\",\n  \"cantidad_personas\": 2,\n  \"notas\": \"Mesa cerca de la ventana\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/reservations",
-              "host": ["{{base_url}}"],
-              "path": ["reservations"]
+              "raw": "{{base_url}}/reservations/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reservations",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Reservation By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/reservations/{{reservation_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reservations",
+                "{{reservation_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List My Reservations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/reservations/?limit=10&skip=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reservations",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "skip",
+                  "value": "0"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Reservation",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notas\": \"Actualizacion de notas\",\n  \"estado\": \"confirmada\",\n  \"numero_mesa\": 5\n}"
             },
-            "description": "Crea una nueva reserva de mesa"
+            "url": {
+              "raw": "{{base_url}}/reservations/{{reservation_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reservations",
+                "{{reservation_id}}"
+              ]
+            }
           }
         },
         {
@@ -325,15 +793,83 @@
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
             ],
             "url": {
-              "raw": "{{base_url}}/reservations/:id",
-              "host": ["{{base_url}}"],
-              "path": ["reservations", ":id"],
-              "variable": [{ "key": "id", "value": "1" }]
-            },
-            "description": "Cancela una reserva existente"
+              "raw": "{{base_url}}/reservations/{{reservation_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reservations",
+                "{{reservation_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Reservations By Restaurante",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/reservations/restaurante/{{restaurant_id}}?limit=10&skip=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reservations",
+                "restaurante",
+                "{{restaurant_id}}"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "skip",
+                  "value": "0"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Confirm Reservation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/reservations/{{reservation_id}}/confirm?numero_mesa=5",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reservations",
+                "{{reservation_id}}",
+                "confirm"
+              ],
+              "query": [
+                {
+                  "key": "numero_mesa",
+                  "value": "5"
+                }
+              ]
+            }
           }
         }
       ]
@@ -346,35 +882,168 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"restaurante_id\": 1,\n  \"items\": [\n    { \"menu_id\": 1, \"cantidad\": 2 },\n    { \"menu_id\": 3, \"cantidad\": 1 }\n  ],\n  \"tipo_entrega\": \"en_restaurante\",\n  \"notas\": \"Sin cebolla en la pasta\"\n}"
+              "raw": "{\n  \"restaurante_id\": {{restaurant_id}},\n  \"items\": [\n    {\"menu_id\": {{menu_id}}, \"cantidad\": 2}\n  ],\n  \"tipo_entrega\": \"en_restaurante\",\n  \"direccion_entrega\": null,\n  \"notas\": \"Sin cebolla\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/orders",
-              "host": ["{{base_url}}"],
-              "path": ["orders"]
-            },
-            "description": "Realiza un pedido"
+              "raw": "{{base_url}}/orders/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                ""
+              ]
+            }
           }
         },
         {
-          "name": "Get Order",
+          "name": "List Orders By Restaurante",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
             ],
             "url": {
-              "raw": "{{base_url}}/orders/:id",
-              "host": ["{{base_url}}"],
-              "path": ["orders", ":id"],
-              "variable": [{ "key": "id", "value": "1" }]
+              "raw": "{{base_url}}/orders/restaurante/{{restaurant_id}}?limit=10&skip=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                "restaurante",
+                "{{restaurant_id}}"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "skip",
+                  "value": "0"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Order By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                "{{order_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List My Orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/?limit=10&skip=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "skip",
+                  "value": "0"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Order",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"confirmado\",\n  \"notas\": \"Pedido actualizado\"\n}"
             },
-            "description": "Obtiene detalles de un pedido"
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                "{{order_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cancel Order",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                "{{order_id}}"
+              ]
+            }
           }
         }
       ]
@@ -388,8 +1057,12 @@
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/",
-              "host": ["{{base_url}}"],
-              "path": [""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                ""
+              ]
             }
           }
         },
@@ -399,8 +1072,12 @@
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/health",
-              "host": ["{{base_url}}"],
-              "path": ["health"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
             }
           }
         }
