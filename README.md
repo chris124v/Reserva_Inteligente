@@ -75,7 +75,7 @@ Update pip y ejecutar requirements.txt
 ```
 pip install --upgrade pip
 
-python -m pip install -r app\requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r app\requirements.txt
 ```
 
 #### Paso 4: Inicializar el contenedor 
@@ -86,6 +86,20 @@ Para ejecutarlo:
 docker-compose up --build
 ```
 
+#### Paso 5: Crear tablas de la base de datos (solo la primera vez)
+
+Si es un entorno nuevo y aun no existen tablas, ejecuta:
+
+```
+.\.venv\Scripts\python.exe -m app.database.init_db
+```
+
+Si estas corriendo todo por Docker:
+
+```
+docker-compose exec api python -m app.database.init_db
+```
+
 Para borrarlo: 
 
 ```
@@ -94,18 +108,3 @@ docker-compose down -v
 
 --- 
 
-### Division
-
-#### Chris 
-
-* Carpeta Database = Conexiones --- RRR
-* Carpeta Models = Esquemas BD --- RRR
-* Carpeta Auth = Uso y conexion de JWT -- RRR
-* Carpeta Routes = Implementacion EndPoints - R
-* Archivos de config y main - R
-
-#### Espi
-
-* Carpeta Schemas = Validacion de datos
-* Carpeta Services = Logica de Negocio
-* Carpeta Tests = Pruebas Unitarias
