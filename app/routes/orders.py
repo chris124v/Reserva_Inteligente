@@ -2,7 +2,10 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.auth.middleware import verify_jwt
+from app.auth.cognito import CognitoClient
+from app.config import settings
 from app.schemas.order import OrderCreate, OrderUpdate, OrderResponse
+from app.services.user_service import get_user_by_email
 from app.services.order_service import (
     get_order,
     get_orders_by_usuario,
@@ -13,6 +16,57 @@ from app.services.order_service import (
 )
 
 router = APIRouter(prefix="/orders", tags=["orders"])
+cognito_client = CognitoClient()
+
+
+def _extract_email_from_cognito_user(user_response: dict) -> str | None:
+    for attr in user_response.get("UserAttributes", []):
+        if attr.get("Name") == "email":
+            return attr.get("Value")
+    return None
+
+
+def _resolve_current_local_user_id(current_user: dict, db: Session) -> int | None:
+    raw_user_id = current_user.get("usuario_id")
+    if raw_user_id is not None:
+        try:
+            return int(raw_user_id)
+        except (TypeError, ValueError):
+            pass
+
+    raw_numeric_id = current_user.get("sub") or current_user.get("username")
+    if raw_numeric_id is not None:
+        try:
+            return int(raw_numeric_id)
+        except (TypeError, ValueError):
+            pass
+
+    email = current_user.get("email")
+    if email:
+        local_user = get_user_by_email(db, email)
+        if local_user:
+            return local_user.id
+
+    username = current_user.get("username") or current_user.get("sub")
+    if not username:
+        return None
+
+    if "@" in username:
+        local_user = get_user_by_email(db, username)
+        return local_user.id if local_user else None
+
+    try:
+        user_response = cognito_client.client.admin_get_user(
+            UserPoolId=settings.COGNITO_USER_POOL_ID,
+            Username=username,
+        )
+        email = _extract_email_from_cognito_user(user_response)
+        if not email:
+            return None
+        local_user = get_user_by_email(db, email)
+        return local_user.id if local_user else None
+    except Exception:
+        return None
 
 
 @router.post("/", response_model=OrderResponse, status_code=201)
@@ -32,14 +86,9 @@ async def crear_pedido(
     """
     try:
         # Obtener usuario_id del JWT
-        usuario_id = current_user.get("sub") or current_user.get("usuario_id")
+        usuario_id = _resolve_current_local_user_id(current_user, db)
         
         if not usuario_id:
-            raise HTTPException(status_code=401, detail="Usuario no autenticado")
-
-        try:
-            usuario_id = int(usuario_id)
-        except (TypeError, ValueError):
             raise HTTPException(status_code=401, detail="Usuario no autenticado")
         
         # Validar dirección de entrega si es domicilio
@@ -113,10 +162,8 @@ async def obtener_pedido(
         raise HTTPException(status_code=404, detail="Pedido no encontrado")
     
     # Validar permiso: el usuario es dueño del pedido o del restaurante
-    usuario_id = current_user.get("sub") or current_user.get("usuario_id")
-    try:
-        usuario_id = int(usuario_id)
-    except (TypeError, ValueError):
+    usuario_id = _resolve_current_local_user_id(current_user, db)
+    if not usuario_id:
         raise HTTPException(status_code=401, detail="Usuario no autenticado")
 
     # TODO: Validar si es dueño del restaurante
@@ -139,11 +186,8 @@ async def listar_mis_pedidos(
     - **limit**: Número máximo de registros (default: 10, máximo: 100)
     - **skip**: Número de registros a saltar para paginación
     """
-    usuario_id = current_user.get("sub") or current_user.get("usuario_id")
-    
-    try:
-        usuario_id = int(usuario_id)
-    except (TypeError, ValueError):
+    usuario_id = _resolve_current_local_user_id(current_user, db)
+    if not usuario_id:
         raise HTTPException(status_code=401, detail="Usuario no autenticado")
     
     orders = get_orders_by_usuario(db, usuario_id)
@@ -172,10 +216,8 @@ async def actualizar_pedido(
         raise HTTPException(status_code=404, detail="Pedido no encontrado")
     
     # Validar permiso
-    usuario_id = current_user.get("sub") or current_user.get("usuario_id")
-    try:
-        usuario_id = int(usuario_id)
-    except (TypeError, ValueError):
+    usuario_id = _resolve_current_local_user_id(current_user, db)
+    if not usuario_id:
         raise HTTPException(status_code=401, detail="Usuario no autenticado")
 
     if db_order.usuario_id != usuario_id:
@@ -203,10 +245,8 @@ async def cancelar_pedido(
         raise HTTPException(status_code=404, detail="Pedido no encontrado")
     
     # Validar permiso
-    usuario_id = current_user.get("sub") or current_user.get("usuario_id")
-    try:
-        usuario_id = int(usuario_id)
-    except (TypeError, ValueError):
+    usuario_id = _resolve_current_local_user_id(current_user, db)
+    if not usuario_id:
         raise HTTPException(status_code=401, detail="Usuario no autenticado")
 
     if db_order.usuario_id != usuario_id:

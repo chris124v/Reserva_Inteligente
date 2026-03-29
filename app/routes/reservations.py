@@ -3,6 +3,9 @@ from datetime import date, time
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.auth.middleware import verify_jwt
+from app.auth.cognito import CognitoClient
+from app.config import settings
+from app.services.user_service import get_user_by_email
 from app.schemas.reservation import (
     ReservationCreate,
     ReservationUpdate,
@@ -20,6 +23,57 @@ from app.services.reservation_service import (
 )
 
 router = APIRouter(prefix="/reservations", tags=["reservations"])
+cognito_client = CognitoClient()
+
+
+def _extract_email_from_cognito_user(user_response: dict) -> str | None:
+    for attr in user_response.get("UserAttributes", []):
+        if attr.get("Name") == "email":
+            return attr.get("Value")
+    return None
+
+
+def _resolve_current_local_user_id(current_user: dict, db: Session) -> int | None:
+    raw_user_id = current_user.get("usuario_id")
+    if raw_user_id is not None:
+        try:
+            return int(raw_user_id)
+        except (TypeError, ValueError):
+            pass
+
+    raw_numeric_id = current_user.get("sub") or current_user.get("username")
+    if raw_numeric_id is not None:
+        try:
+            return int(raw_numeric_id)
+        except (TypeError, ValueError):
+            pass
+
+    email = current_user.get("email")
+    if email:
+        local_user = get_user_by_email(db, email)
+        if local_user:
+            return local_user.id
+
+    username = current_user.get("username") or current_user.get("sub")
+    if not username:
+        return None
+
+    if "@" in username:
+        local_user = get_user_by_email(db, username)
+        return local_user.id if local_user else None
+
+    try:
+        user_response = cognito_client.client.admin_get_user(
+            UserPoolId=settings.COGNITO_USER_POOL_ID,
+            Username=username,
+        )
+        email = _extract_email_from_cognito_user(user_response)
+        if not email:
+            return None
+        local_user = get_user_by_email(db, email)
+        return local_user.id if local_user else None
+    except Exception:
+        return None
 
 
 @router.post("/", response_model=ReservationResponse, status_code=201)
@@ -38,7 +92,7 @@ async def crear_reserva(
     - **notas**: Notas adicionales (opcional)
     """
     try:
-        usuario_id = current_user.get("sub") or current_user.get("usuario_id")
+        usuario_id = _resolve_current_local_user_id(current_user, db)
         
         if not usuario_id:
             raise HTTPException(status_code=401, detail="Usuario no autenticado")
@@ -83,7 +137,10 @@ async def obtener_reserva(
     if not db_reservation:
         raise HTTPException(status_code=404, detail="Reserva no encontrada")
     
-    usuario_id = current_user.get("sub") or current_user.get("usuario_id")
+    usuario_id = _resolve_current_local_user_id(current_user, db)
+
+    if not usuario_id:
+        raise HTTPException(status_code=401, detail="Usuario no autenticado")
     
     # TODO: Validar si es dueño del restaurante
     if db_reservation.usuario_id != usuario_id:
@@ -105,7 +162,7 @@ async def listar_mis_reservas(
     - **limit**: Número máximo de registros (default: 10, máximo: 100)
     - **skip**: Número de registros a saltar para paginación
     """
-    usuario_id = current_user.get("sub") or current_user.get("usuario_id")
+    usuario_id = _resolve_current_local_user_id(current_user, db)
     
     if not usuario_id:
         raise HTTPException(status_code=401, detail="Usuario no autenticado")
@@ -133,7 +190,10 @@ async def actualizar_reserva(
     if not db_reservation:
         raise HTTPException(status_code=404, detail="Reserva no encontrada")
     
-    usuario_id = current_user.get("sub") or current_user.get("usuario_id")
+    usuario_id = _resolve_current_local_user_id(current_user, db)
+
+    if not usuario_id:
+        raise HTTPException(status_code=401, detail="Usuario no autenticado")
     
     # Si no es admin, solo puede actualizar notas
     if db_reservation.usuario_id != usuario_id:
@@ -168,7 +228,10 @@ async def cancelar_reserva(
     if not db_reservation:
         raise HTTPException(status_code=404, detail="Reserva no encontrada")
     
-    usuario_id = current_user.get("sub") or current_user.get("usuario_id")
+    usuario_id = _resolve_current_local_user_id(current_user, db)
+
+    if not usuario_id:
+        raise HTTPException(status_code=401, detail="Usuario no autenticado")
     
     if db_reservation.usuario_id != usuario_id:
         raise HTTPException(status_code=403, detail="No tiene permiso para cancelar esta reserva")

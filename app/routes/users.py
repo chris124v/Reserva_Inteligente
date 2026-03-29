@@ -28,6 +28,14 @@ def _extract_email_from_cognito_user(user_response: dict) -> str | None:
     return None
 
 
+def _extract_name_from_cognito_user(user_response: dict) -> str | None:
+    attrs = user_response.get("UserAttributes", [])
+    for attr in attrs:
+        if attr.get("Name") == "name":
+            return attr.get("Value")
+    return None
+
+
 def _resolve_current_user_email(current_user: dict) -> str | None:
     # Algunos tokens (id token) incluyen email directamente
     email = current_user.get("email")
@@ -49,6 +57,20 @@ def _resolve_current_user_email(current_user: dict) -> str | None:
             Username=username,
         )
         return _extract_email_from_cognito_user(user_response)
+    except Exception:
+        return None
+
+
+def _get_cognito_user(current_user: dict) -> dict | None:
+    username = current_user.get("username") or current_user.get("sub")
+    if not username:
+        return None
+
+    try:
+        return cognito_client.client.admin_get_user(
+            UserPoolId=settings.COGNITO_USER_POOL_ID,
+            Username=username,
+        )
     except Exception:
         return None
 
@@ -117,6 +139,37 @@ def _resolve_current_local_user(current_user: dict, db: Session) -> User | None:
     return None
 
 
+def _sync_local_user_from_cognito(current_user: dict, db: Session) -> User | None:
+    """
+    Crea el usuario local en la BD si existe en Cognito pero aun no esta sincronizado.
+    """
+    cognito_user = _get_cognito_user(current_user)
+    if not cognito_user:
+        return None
+
+    email = _extract_email_from_cognito_user(cognito_user)
+    if not email:
+        return None
+
+    existing = get_user_by_email(db, email)
+    if existing:
+        return existing
+
+    display_name = _extract_name_from_cognito_user(cognito_user) or email.split("@")[0]
+
+    db_user = User(
+        email=email,
+        nombre=display_name,
+        password_hash="cognito",
+        rol=RoleEnum.CLIENTE,
+        activo=True,
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+
 @router.post("/", response_model=UserResponse, status_code=201)
 async def crear_usuario(
     user_data: UserCreate,
@@ -172,6 +225,10 @@ async def obtener_mi_perfil(
         current_email = _resolve_current_user_email(current_user)
         if current_email:
             db_user = get_user_by_email(db, current_email)
+
+    # Auto-sync: si existe en Cognito pero no en BD local, lo creamos al primer /me
+    if not db_user:
+        db_user = _sync_local_user_from_cognito(current_user, db)
 
     if not db_user:
         raise HTTPException(

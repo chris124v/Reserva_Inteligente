@@ -2,7 +2,10 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.auth.middleware import verify_jwt
+from app.auth.cognito import CognitoClient
+from app.config import settings
 from app.schemas.restaurant import RestaurantCreate, RestaurantUpdate, RestaurantResponse
+from app.services.user_service import get_user_by_email
 from app.services.restaurant_service import (
     get_restaurant,
     get_restaurant_by_email,
@@ -14,6 +17,57 @@ from app.services.restaurant_service import (
 )
 
 router = APIRouter(prefix="/restaurants", tags=["restaurants"])
+cognito_client = CognitoClient()
+
+
+def _extract_email_from_cognito_user(user_response: dict) -> str | None:
+    for attr in user_response.get("UserAttributes", []):
+        if attr.get("Name") == "email":
+            return attr.get("Value")
+    return None
+
+
+def _resolve_current_local_user_id(current_user: dict, db: Session) -> int | None:
+    raw_user_id = current_user.get("usuario_id")
+    if raw_user_id is not None:
+        try:
+            return int(raw_user_id)
+        except (TypeError, ValueError):
+            pass
+
+    raw_numeric_id = current_user.get("sub") or current_user.get("username")
+    if raw_numeric_id is not None:
+        try:
+            return int(raw_numeric_id)
+        except (TypeError, ValueError):
+            pass
+
+    email = current_user.get("email")
+    if email:
+        local_user = get_user_by_email(db, email)
+        if local_user:
+            return local_user.id
+
+    username = current_user.get("username") or current_user.get("sub")
+    if not username:
+        return None
+
+    if "@" in username:
+        local_user = get_user_by_email(db, username)
+        return local_user.id if local_user else None
+
+    try:
+        user_response = cognito_client.client.admin_get_user(
+            UserPoolId=settings.COGNITO_USER_POOL_ID,
+            Username=username,
+        )
+        email = _extract_email_from_cognito_user(user_response)
+        if not email:
+            return None
+        local_user = get_user_by_email(db, email)
+        return local_user.id if local_user else None
+    except Exception:
+        return None
 
 
 @router.post("/", response_model=RestaurantResponse, status_code=201)
@@ -36,7 +90,7 @@ async def crear_restaurante(
     - **total_mesas**: Total de mesas disponibles (default: 10)
     """
     try:
-        admin_id = current_user.get("sub") or current_user.get("usuario_id")
+        admin_id = _resolve_current_local_user_id(current_user, db)
         
         if not admin_id:
             raise HTTPException(status_code=401, detail="Usuario no autenticado")
@@ -113,7 +167,7 @@ async def listar_mis_restaurantes(
     - **limit**: Número máximo de registros
     - **skip**: Número de registros a saltar
     """
-    admin_id = current_user.get("sub") or current_user.get("usuario_id")
+    admin_id = _resolve_current_local_user_id(current_user, db)
     
     if not admin_id:
         raise HTTPException(status_code=401, detail="Usuario no autenticado")
@@ -143,7 +197,10 @@ async def actualizar_restaurante(
         raise HTTPException(status_code=404, detail="Restaurante no encontrado")
     
     # Validar permisos: usuario debe ser admin del restaurante
-    admin_id = current_user.get("sub") or current_user.get("usuario_id")
+    admin_id = _resolve_current_local_user_id(current_user, db)
+
+    if not admin_id:
+        raise HTTPException(status_code=401, detail="Usuario no autenticado")
     
     if db_restaurant.admin_id != admin_id:
         raise HTTPException(
@@ -185,7 +242,10 @@ async def eliminar_restaurante(
         raise HTTPException(status_code=404, detail="Restaurante no encontrado")
     
     # Validar permisos
-    admin_id = current_user.get("sub") or current_user.get("usuario_id")
+    admin_id = _resolve_current_local_user_id(current_user, db)
+
+    if not admin_id:
+        raise HTTPException(status_code=401, detail="Usuario no autenticado")
     
     if db_restaurant.admin_id != admin_id:
         raise HTTPException(
