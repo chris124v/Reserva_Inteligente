@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, ConfigDict
 from typing import Optional
 from datetime import date, time, datetime
 from app.models.reservation import EstadoReservaEnum
@@ -38,5 +38,4 @@ class ReservationResponse(ReservationBase):
     estado: EstadoReservaEnum
     numero_mesa: Optional[int] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

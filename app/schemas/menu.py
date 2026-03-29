@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 
 # Base con los campos comunes
@@ -28,5 +28,4 @@ class MenuResponse(MenuBase):
     id: int
     restaurante_id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

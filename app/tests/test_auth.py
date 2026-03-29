@@ -6,6 +6,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
+from fastapi.security import HTTPAuthorizationCredentials
  
 # Fixtures
 
@@ -116,19 +117,17 @@ def test_login_password_incorrecta(cognito):
 
 def test_verify_token_valido(cognito):
 
-    #Retorna un header con el kid esperado y un payload simulado, para que la verificacion del token pase
-    with patch("app.auth.cognito.jwt.get_unverified_header", return_value={"kid": "k1"}), \
-         patch("app.auth.cognito.jwt.decode", return_value={"sub": "123", "email": "u@test.com"}):
-        cognito.client.get_signing_certificate.return_value = {"Certificate": "fake-cert"} #Realmente esto no es un certificado valido, pero como el decode esta mockeado para retornar un payload valido, la verificacion del token pasará
-        result = cognito.verify_token("valid.token") #Funcion valida
+    # Simula una llave valida desde JWKS y un payload de access token valido.
+    with patch.object(cognito.jwks_client, "get_signing_key_from_jwt", return_value=MagicMock(key="fake-key")), \
+         patch("app.auth.cognito.jwt.decode", return_value={"sub": "123", "token_use": "access", "client_id": "fake-client-id"}):
+        result = cognito.verify_token("valid.token")
     assert result["success"] is True
 
 # Funcion que simula el caso de token expirado, boto3 lanzaria una excepcion que simula el mock
 def test_verify_token_expirado(cognito):
     import jwt as pyjwt #Importamos jwt para usar la excepcion de token expirado que boto3 lanzaria, el mock simula esa excepcion cuando se intenta decodificar el token, lo que hace que la verificacion del token falle y retorne un error indicando que el token ha expirado
-    with patch("app.auth.cognito.jwt.get_unverified_header", return_value={"kid": "k1"}), \
+    with patch.object(cognito.jwks_client, "get_signing_key_from_jwt", return_value=MagicMock(key="fake-key")), \
          patch("app.auth.cognito.jwt.decode", side_effect=pyjwt.ExpiredSignatureError()): #Lanza una excepcion directamente
-        cognito.client.get_signing_certificate.return_value = {"Certificate": "fake-cert"}
         result = cognito.verify_token("expired.token")
     assert result["success"] is False
     assert "expirado" in result["error"]
@@ -139,25 +138,22 @@ def test_verify_token_expirado(cognito):
 @pytest.mark.asyncio #Permite utilizar funciones asincronas en los tests, necesario para probar el middleware que es async
 async def test_middleware_sin_token():
     from app.auth.middleware import verify_jwt #Importamos la funcion a testear
-    req = MagicMock()
-    req.headers.get.return_value = None #Creamos un request simulado 
     with pytest.raises(HTTPException) as exc: #Esperamos que se lance una excepcion HTTPException porque no se proporciona un token
-        await verify_jwt(req)
+        await verify_jwt(None)
     assert exc.value.status_code == 401 #Verificamos que el código de estado de la excepción sea 401, lo que indica que no se proporcionó un token
 
 #Probar directamente un token valido. 
 @pytest.mark.asyncio
 async def test_middleware_token_valido():
 
-    #Creamos un request simulado con un header de autorización 
+    # Creamos credenciales HTTP Bearer simuladas (nuevo contrato del middleware).
     from app.auth.middleware import verify_jwt
-    req = MagicMock()
-    req.headers.get.return_value = "Bearer valid.token"
+    creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid.token")
 
     #Mockeamos la función de verificación de token para que retorne un payload simulado indicando que el token es válido, lo que hace que el middleware devuelva la información del usuario en lugar de lanzar una excepción
     with patch("app.auth.middleware.cognito_client") as mock:
         mock.verify_token.return_value = {"success": True, "payload": {"sub": "123"}}
-        result = await verify_jwt(req)
+        result = await verify_jwt(creds)
     assert result["sub"] == "123"
  
  
