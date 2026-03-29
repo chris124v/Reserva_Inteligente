@@ -10,6 +10,12 @@ Por otro lado, existe la necesidad de garantizar la seguridad y el control de ac
 * Christopher Daniel Vargas Villalta, 2024108443
 * Santiago Espinoza Rendon, 2024156530
 
+---
+
+## Link Video
+
+Link del video en drive: https://drive.google.com/drive/folders/1tQjWgyzezb5PqcCSK9BTaOXIgAVQ6A0w?usp=sharing
+
 --- 
 
 ## Technology Stack
