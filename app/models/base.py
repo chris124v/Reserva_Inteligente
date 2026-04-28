@@ -4,7 +4,7 @@ from app.database.connection import Base
 
 
 def _utcnow_naive() -> datetime:
-    # Avoid datetime.utcnow deprecation while keeping naive UTC datetimes.
+    # Avoid datetime.utcnow deprecation while keeping naive UTC datetimes. significa que no tienen información de zona horaria, pero se asume que están en UTC.
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 class BaseModel(Base):

@@ -41,7 +41,7 @@ class CognitoClient:
             f"{self.issuer}/.well-known/jwks.json"
         )
     
-    def register_user(self, email: str, password: str, nombre: str):
+    def register_user(self, email: str, password: str, nombre: str, rol: str | None = None):
         
         # Registra un usuario nuevo en Cognito
 
@@ -70,6 +70,19 @@ class CognitoClient:
                     {'Name': 'name', 'Value': nombre}
                 ]
             )
+
+            # Intento best-effort: persistir rol en Cognito como atributo custom.
+            # Nota: requiere que el User Pool tenga creado el atributo `custom:rol`.
+            if rol:
+                try:
+                    self.client.admin_update_user_attributes(
+                        UserPoolId=settings.COGNITO_USER_POOL_ID,
+                        Username=email,
+                        UserAttributes=[{'Name': 'custom:rol', 'Value': str(rol)}],
+                    )
+                except Exception:
+                    # No fallamos el registro si el atributo no existe/configurada.
+                    pass
     
             return {"success": True, "message": "Usuario registrado"}
 
@@ -155,3 +168,65 @@ class CognitoClient:
             return {"success": False, "error": "Token inválido"}
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+
+    def _find_username_by_email(self, email_value: str) -> str:
+        """Busca el Username real de Cognito por atributo email.
+
+        Funciona tanto si el pool usa el email como username, como si usa un
+        username interno (UUID) y email como atributo.
+        """
+        response = self.client.list_users(
+            UserPoolId=settings.COGNITO_USER_POOL_ID,
+            Filter=f'email = "{email_value}"',
+            Limit=2,
+        )
+
+        users = response.get("Users", [])
+        if not users:
+            raise ValueError("Usuario no encontrado en Cognito")
+        if len(users) > 1:
+            raise ValueError("Email duplicado en Cognito")
+
+        username = users[0].get("Username")
+        if not username:
+            raise ValueError("Respuesta inválida de Cognito (Username faltante)")
+        return username
+
+    def update_user_email(self, current_email: str, new_email: str):
+        """Actualiza el email del usuario en Cognito.
+
+        Nota: esto actualiza el atributo `email`. Dependiendo de la configuración
+        del User Pool, el `Username` puede no cambiar.
+        """
+        username = self._find_username_by_email(current_email)
+        self.client.admin_update_user_attributes(
+            UserPoolId=settings.COGNITO_USER_POOL_ID,
+            Username=username,
+            UserAttributes=[
+                {"Name": "email", "Value": new_email},
+                {"Name": "email_verified", "Value": "true"},
+            ],
+        )
+
+    def get_user_sub_by_email(self, email_value: str) -> str:
+        """Obtiene el `sub` (UUID) de Cognito para un usuario por su email."""
+        response = self.client.list_users(
+            UserPoolId=settings.COGNITO_USER_POOL_ID,
+            Filter=f'email = "{email_value}"',
+            Limit=2,
+        )
+        users = response.get("Users", [])
+        if not users:
+            raise ValueError("Usuario no encontrado en Cognito")
+        if len(users) > 1:
+            raise ValueError("Email duplicado en Cognito")
+
+        attrs = users[0].get("Attributes", [])
+        for attr in attrs:
+            if attr.get("Name") == "sub":
+                value = attr.get("Value")
+                if value:
+                    return value
+
+        raise ValueError("No se encontró atributo sub en Cognito")

@@ -7,7 +7,7 @@ services:
   db:
     image: postgres:15-alpine
     container_name: restaurantes_db
-    restart: always
+    restart: no
     environment:
       POSTGRES_USER: ${DATABASE_USER}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
@@ -31,7 +31,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: restaurantes_api
-    restart: always
+    restart: no
     environment:
       DATABASE_URL: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@db:5432/${DATABASE_NAME}
       DATABASE_HOST: db
@@ -53,7 +53,7 @@ services:
       db:
         condition: service_healthy
     volumes:
-      # Para desarrollo hot-reload
+      # Para desarrollo hot-reload n
       - .:/code
     networks:
       - restaurantes_network

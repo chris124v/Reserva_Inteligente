@@ -24,4 +24,14 @@ class Settings:
     SECRET_KEY = os.getenv("SECRET_KEY", "tu-clave-secreta-aqui")
     ALGORITHM = "HS256"
 
+    # Auth / Roles
+    # Si se define, se requerirá este código para registrarse como admin.
+    # Si NO se define, se permite bootstrap: el primer admin puede crearse solo si
+    # aún no existe ningún usuario admin en la BD.
+    ADMIN_REGISTRATION_CODE = os.getenv("ADMIN_REGISTRATION_CODE")
+
+    # Código adicional para operaciones sensibles (gestión de usuarios).
+    # Recomendación: usarlo solo en requests de admins autorizados.
+    MASTER_ADMIN_CODE = os.getenv("MASTER_ADMIN_CODE")
+
 settings = Settings()

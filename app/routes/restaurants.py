@@ -6,6 +6,8 @@ from app.auth.cognito import CognitoClient
 from app.config import settings
 from app.schemas.restaurant import RestaurantCreate, RestaurantUpdate, RestaurantResponse
 from app.services.user_service import get_user_by_email
+from app.services.user_service import get_user
+from app.models.user import RoleEnum
 from app.services.restaurant_service import (
     get_restaurant,
     get_restaurant_by_email,
@@ -94,6 +96,13 @@ async def crear_restaurante(
         
         if not admin_id:
             raise HTTPException(status_code=401, detail="Usuario no autenticado")
+
+        admin_user = get_user(db, admin_id)
+        if not admin_user:
+            raise HTTPException(status_code=401, detail="Usuario no autenticado o no sincronizado en BD local")
+
+        if admin_user.rol != RoleEnum.ADMIN:
+            raise HTTPException(status_code=403, detail="Solo usuarios admin pueden crear restaurantes")
         
         # Verificar que el email no exista
         existing = get_restaurant_by_email(db, restaurant_data.email)
@@ -171,6 +180,13 @@ async def listar_mis_restaurantes(
     
     if not admin_id:
         raise HTTPException(status_code=401, detail="Usuario no autenticado")
+
+    admin_user = get_user(db, admin_id)
+    if not admin_user:
+        raise HTTPException(status_code=401, detail="Usuario no autenticado o no sincronizado en BD local")
+
+    if admin_user.rol != RoleEnum.ADMIN:
+        raise HTTPException(status_code=403, detail="Solo usuarios admin pueden acceder a esta ruta")
     
     restaurants = get_restaurants_by_admin(db, admin_id)
     
@@ -201,6 +217,13 @@ async def actualizar_restaurante(
 
     if not admin_id:
         raise HTTPException(status_code=401, detail="Usuario no autenticado")
+
+    admin_user = get_user(db, admin_id)
+    if not admin_user:
+        raise HTTPException(status_code=401, detail="Usuario no autenticado o no sincronizado en BD local")
+
+    if admin_user.rol != RoleEnum.ADMIN:
+        raise HTTPException(status_code=403, detail="Solo usuarios admin pueden actualizar restaurantes")
     
     if db_restaurant.admin_id != admin_id:
         raise HTTPException(
@@ -246,6 +269,13 @@ async def eliminar_restaurante(
 
     if not admin_id:
         raise HTTPException(status_code=401, detail="Usuario no autenticado")
+
+    admin_user = get_user(db, admin_id)
+    if not admin_user:
+        raise HTTPException(status_code=401, detail="Usuario no autenticado o no sincronizado en BD local")
+
+    if admin_user.rol != RoleEnum.ADMIN:
+        raise HTTPException(status_code=403, detail="Solo usuarios admin pueden eliminar restaurantes")
     
     if db_restaurant.admin_id != admin_id:
         raise HTTPException(

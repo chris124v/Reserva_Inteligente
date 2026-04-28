@@ -402,8 +402,9 @@ class TestMenuEndpoints:
         retrieved = get_menu(test_db, menu.id)
         assert retrieved is None
     
-    def test_eliminar_menu_no_existe(self, client):
+    def test_eliminar_menu_no_existe(self, client, create_test_data):
         """DELETE /menus/{id} debe retornar 404 si no existe."""
+        create_test_data["create_user"](email="admin_del@test.com", rol="admin")
         # Act
         response = client.delete(
             "/menus/999",

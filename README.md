@@ -44,6 +44,27 @@ Link del video en drive: https://drive.google.com/drive/folders/1tQjWgyzezb5PqcC
 
 ## Instructivo de Uso
 
+### Roles (cliente vs admin)
+
+El sistema maneja roles en la BD local (`users.rol`): `cliente` y `admin`.
+
+- Registro normal (cliente): `POST /auth/register` sin enviar `rol` (o con `rol: "cliente"`).
+- Registro como admin: `POST /auth/register` con `rol: "admin"`.
+	- Si existe la variable `ADMIN_REGISTRATION_CODE`, también debes enviar `admin_code` con el mismo valor.
+	- Si NO existe `ADMIN_REGISTRATION_CODE`, solo se permite crear el primer admin (bootstrap). Luego se bloquea.
+
+### Permisos (restaurantes y menús)
+
+- Usuarios `cliente`: solo pueden usar endpoints `GET` de restaurantes y menús.
+- Usuarios `admin`: pueden `POST/PUT/DELETE` restaurantes y menús, pero solo sobre recursos que les pertenezcan.
+	- Un restaurante pertenece al admin si `restaurants.admin_id == user.id`.
+	- Un menú solo puede ser modificado por el admin dueño del restaurante al que pertenece.
+
+### Master Admin (gestión de usuarios)
+
+Para que un `admin` pueda actualizar/eliminar usuarios (que no sea su propio perfil), debe enviar el header `X-Master-Admin-Code`
+con el valor de `MASTER_ADMIN_CODE` (definido en el `.env`).
+
 ### Instalacion de Dependencias
 
 Requisitos Previos:

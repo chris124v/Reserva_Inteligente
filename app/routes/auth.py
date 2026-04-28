@@ -1,8 +1,12 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from app.database.session import get_db
 from app.auth.cognito import CognitoClient
 from app.config import settings
 from app.auth.cognito import CognitoClient, get_secret_hash
+from app.models.user import RoleEnum, User
+from app.services.user_service import get_user_by_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 cognito_client = CognitoClient()
@@ -12,6 +16,8 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     nombre: str
+    rol: RoleEnum = RoleEnum.CLIENTE
+    admin_code: str | None = None
     
 class LoginRequest(BaseModel):
     email: str
@@ -26,17 +32,68 @@ class RefreshRequest(BaseModel):
 @router.post("/register")
 
 # Registra un nuevo usuario en Cognito
-async def register(data: RegisterRequest):
+async def register(data: RegisterRequest, db: Session = Depends(get_db)):
+
+    requested_role = data.rol or RoleEnum.CLIENTE
+
+    # Seguridad: no permitir auto-elevación a admin sin control.
+    if requested_role == RoleEnum.ADMIN:
+        # Si ya existe usuario local, no permitimos cambiar rol por "re-registro".
+        existing_local = get_user_by_email(db, data.email)
+        if existing_local and existing_local.rol != RoleEnum.ADMIN:
+            raise HTTPException(
+                status_code=403,
+                detail="No se permite convertir un usuario existente en admin desde /register"
+            )
+
+        if settings.ADMIN_REGISTRATION_CODE:
+            if not data.admin_code or data.admin_code != settings.ADMIN_REGISTRATION_CODE:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Código de admin inválido"
+                )
+        else:
+            # Bootstrap: si no hay código configurado, solo se permite crear el primer admin
+            # cuando aún no existe ningún admin en la BD.
+            any_admin = db.query(User).filter(User.rol == RoleEnum.ADMIN).first()
+            if any_admin:
+                raise HTTPException(
+                    status_code=403,
+                    detail="No se permite registrar admins (configura ADMIN_REGISTRATION_CODE)"
+                )
+    else:
+        requested_role = RoleEnum.CLIENTE
 
     # Aquí llamas a cognito_client.register_user()
     result = cognito_client.register_user(
         email=data.email,
         password=data.password,
-        nombre=data.nombre
+        nombre=data.nombre,
+        rol=requested_role.value
     )
 
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
+
+    local_user = get_user_by_email(db, data.email)
+    if not local_user:
+        local_user = User(
+            email=data.email,
+            nombre=data.nombre,
+            password_hash="cognito",
+            rol=requested_role,
+            activo=True,
+        )
+        db.add(local_user)
+        db.commit()
+        db.refresh(local_user)
+
+    if not local_user:
+        raise HTTPException(
+            status_code=500,
+            detail="Usuario creado en Cognito pero no se pudo sincronizar en la BD local"
+        )
+
     return result
 
 #Autentica un usuario y devuelve un JWT
