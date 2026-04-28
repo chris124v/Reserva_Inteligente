@@ -267,12 +267,11 @@ class TestMenuEndpoints:
             "disponible": True,
             "tiempo_preparacion": 10,
             "categoria": "plato_principal",
-            "restaurante_id": restaurant.id
         }
         
         # Act
         response = client.post(
-            "/menus/",
+            f"/menus/?restaurante_id={restaurant.id}",
             json=menu_data,
             headers={"Authorization": "Bearer test-token"}
         )
@@ -287,11 +286,10 @@ class TestMenuEndpoints:
         """POST /menus/ debe requerir autenticación."""
         # Act
         response = client.post(
-            "/menus/",
+            "/menus/?restaurante_id=1",
             json={
                 "nombre": "Pizza",
                 "precio": 12.0,
-                "restaurante_id": 1
             }
         )
         
@@ -328,7 +326,7 @@ class TestMenuEndpoints:
         assert response.status_code == 404
     
     def test_listar_menus_restaurante(self, client, test_db, create_test_data):
-        """GET /menus/restaurante/{id} debe listar menús."""
+        """GET /menus/?restaurante_id={id} debe listar menús."""
         # Arrange
         user = create_test_data["create_user"]()
         restaurant = create_test_data["create_restaurant"](admin_id=user.id)
@@ -342,7 +340,7 @@ class TestMenuEndpoints:
             create_menu(test_db, menu_data)
         
         # Act
-        response = client.get(f"/menus/restaurante/{restaurant.id}")
+        response = client.get(f"/menus/?restaurante_id={restaurant.id}")
         
         # Assert
         assert response.status_code == 200

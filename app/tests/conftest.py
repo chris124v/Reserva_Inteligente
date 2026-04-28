@@ -274,8 +274,30 @@ def create_test_data(test_db):
         test_db.add(restaurant)
         test_db.commit()
         return restaurant
+
+    def _create_menu(
+        restaurante_id: int,
+        nombre: str = "Menu Test",
+        precio: float = 10.0,
+        disponible: bool = True,
+    ):
+        from app.models.menu import Menu
+
+        menu = Menu(
+            nombre=nombre,
+            descripcion="Descripción",
+            precio=precio,
+            disponible=disponible,
+            restaurante_id=restaurante_id,
+            tiempo_preparacion=10,
+            categoria="principal",
+        )
+        test_db.add(menu)
+        test_db.commit()
+        return menu
     
     return {
         "create_user": _create_user,
-        "create_restaurant": _create_restaurant
+        "create_restaurant": _create_restaurant,
+        "create_menu": _create_menu,
     }

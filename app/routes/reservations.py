@@ -1,26 +1,25 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
-from datetime import date, time
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.auth.middleware import verify_jwt
 from app.auth.cognito import CognitoClient
 from app.config import settings
 from app.services.user_service import get_user_by_email
+from app.services.user_service import get_user
+from app.models.user import RoleEnum
 from app.schemas.reservation import (
     ReservationCreate,
     ReservationUpdate,
-    ReservationCancel,
     ReservationResponse
 )
 from app.services.reservation_service import (
     get_reservation,
     get_reservations_by_usuario,
     get_reservations_by_restaurante,
-    check_disponibilidad,
     create_reservation,
-    cancel_reservation,
-    confirm_reservation
+    cancel_reservation
 )
+from app.services.restaurant_service import get_restaurant
 
 router = APIRouter(prefix="/reservations", tags=["reservations"])
 cognito_client = CognitoClient()
@@ -96,9 +95,19 @@ async def crear_reserva(
         
         if not usuario_id:
             raise HTTPException(status_code=401, detail="Usuario no autenticado")
+
+        local_user = get_user(db, usuario_id)
+        if not local_user:
+            raise HTTPException(status_code=401, detail="Usuario no autenticado o no sincronizado en BD local")
+
+        if local_user.rol != RoleEnum.CLIENTE:
+            raise HTTPException(status_code=403, detail="Solo usuarios cliente pueden crear reservas")
         
-        # TODO: Validar que el restaurante existe y obtener número total de mesas
-        total_mesas = 10  # Por defecto, esto debería venir del restaurante
+        restaurante = get_restaurant(db, reservation_data.restaurante_id)
+        if not restaurante:
+            raise HTTPException(status_code=404, detail="Restaurante no encontrado")
+
+        total_mesas = restaurante.total_mesas
         
         # Crear la reserva
         db_reservation = create_reservation(
@@ -111,7 +120,7 @@ async def crear_reserva(
         if not db_reservation:
             raise HTTPException(
                 status_code=400,
-                detail="No hay mesas disponibles para esa fecha y hora"
+                detail="Para ese dia ya esta lleno"
             )
         
         return db_reservation
@@ -120,33 +129,6 @@ async def crear_reserva(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al crear la reserva: {str(e)}")
-
-
-@router.get("/{reservation_id}", response_model=ReservationResponse)
-async def obtener_reserva(
-    reservation_id: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(verify_jwt)
-):
-    """
-    Obtiene los detalles de una reserva específica.
-    Solo el usuario propietario o admin del restaurante pueden verla.
-    """
-    db_reservation = get_reservation(db, reservation_id)
-    
-    if not db_reservation:
-        raise HTTPException(status_code=404, detail="Reserva no encontrada")
-    
-    usuario_id = _resolve_current_local_user_id(current_user, db)
-
-    if not usuario_id:
-        raise HTTPException(status_code=401, detail="Usuario no autenticado")
-    
-    # TODO: Validar si es dueño del restaurante
-    if db_reservation.usuario_id != usuario_id:
-        raise HTTPException(status_code=403, detail="No tiene permiso para ver esta reserva")
-    
-    return db_reservation
 
 
 @router.get("/", response_model=list[ReservationResponse])
@@ -166,6 +148,13 @@ async def listar_mis_reservas(
     
     if not usuario_id:
         raise HTTPException(status_code=401, detail="Usuario no autenticado")
+
+    local_user = get_user(db, usuario_id)
+    if not local_user:
+        raise HTTPException(status_code=401, detail="Usuario no autenticado o no sincronizado en BD local")
+
+    if local_user.rol != RoleEnum.CLIENTE:
+        raise HTTPException(status_code=403, detail="Lo siento, solo clientes tienen reservas")
     
     reservations = get_reservations_by_usuario(db, usuario_id)
     
@@ -221,7 +210,7 @@ async def cancelar_reserva(
 ):
     """
     Cancela una reserva.
-    Solo reservas en estado PENDIENTE o CONFIRMADA pueden ser canceladas.
+    Solo reservas en estado RESERVADA pueden ser canceladas.
     """
     db_reservation = get_reservation(db, reservation_id)
     
@@ -237,7 +226,7 @@ async def cancelar_reserva(
         raise HTTPException(status_code=403, detail="No tiene permiso para cancelar esta reserva")
     
     # Validar estado
-    if db_reservation.estado.value not in ["pendiente", "confirmada"]:
+    if db_reservation.estado.value != "reservada":
         raise HTTPException(
             status_code=400,
             detail=f"No se puede cancelar una reserva en estado {db_reservation.estado.value}"
@@ -265,7 +254,23 @@ async def listar_reservas_restaurante(
     - **limit**: Número máximo de registros
     - **skip**: Número de registros a saltar
     """
-    # TODO: Validar que el usuario es dueño del restaurante
+    usuario_id = _resolve_current_local_user_id(current_user, db)
+    if not usuario_id:
+        raise HTTPException(status_code=401, detail="Usuario no autenticado")
+
+    local_user = get_user(db, usuario_id)
+    if not local_user:
+        raise HTTPException(status_code=401, detail="Usuario no autenticado o no sincronizado en BD local")
+
+    if local_user.rol != RoleEnum.ADMIN:
+        raise HTTPException(status_code=403, detail="Solo admins pueden ver reservas por restaurante")
+
+    restaurante = get_restaurant(db, restaurante_id)
+    if not restaurante:
+        raise HTTPException(status_code=404, detail="Restaurante no encontrado")
+
+    if restaurante.admin_id != local_user.id:
+        raise HTTPException(status_code=403, detail="No tiene permiso para ver las reservas de este restaurante")
     
     reservations = get_reservations_by_restaurante(db, restaurante_id)
     
@@ -273,35 +278,3 @@ async def listar_reservas_restaurante(
     return reservations[skip : skip + limit]
 
 
-@router.post("/{reservation_id}/confirm", response_model=ReservationResponse)
-async def confirmar_reserva(
-    reservation_id: int,
-    numero_mesa: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(verify_jwt)
-):
-    """
-    Confirma una reserva y asigna un número de mesa.
-    Solo el admin del restaurante puede hacer esto.
-    """
-    db_reservation = get_reservation(db, reservation_id)
-    
-    if not db_reservation:
-        raise HTTPException(status_code=404, detail="Reserva no encontrada")
-    
-    # TODO: Validar que el usuario es admin del restaurante
-    
-    if db_reservation.estado.value != "pendiente":
-        raise HTTPException(
-            status_code=400,
-            detail="Solo se pueden confirmar reservas pendientes"
-        )
-    
-    if numero_mesa <= 0:
-        raise HTTPException(status_code=400, detail="Número de mesa inválido")
-    
-    # Confirmar
-    confirm_reservation(db, reservation_id, numero_mesa)
-    
-    updated = get_reservation(db, reservation_id)
-    return updated

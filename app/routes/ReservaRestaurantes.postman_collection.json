@@ -12,8 +12,7 @@
     { "key": "user_id", "value": "1", "type": "string" },
     { "key": "restaurant_id", "value": "1", "type": "string" },
     { "key": "menu_id", "value": "1", "type": "string" },
-    { "key": "reservation_id", "value": "1", "type": "string" },
-    { "key": "order_id", "value": "1", "type": "string" }
+    { "key": "reservation_id", "value": "1", "type": "string" }
   ],
   "item": [
     {
@@ -277,35 +276,6 @@
           }
         },
         {
-          "name": "Get Restaurant By ID",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/restaurants/{{restaurant_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["restaurants", "{{restaurant_id}}"]
-            }
-          }
-        },
-        {
-          "name": "List My Restaurants",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
-            ],
-            "url": {
-              "raw": "{{base_url}}/restaurants/admin/mis-restaurantes?limit=10&skip=0",
-              "host": ["{{base_url}}"],
-              "path": ["restaurants", "admin", "mis-restaurantes"],
-              "query": [
-                { "key": "limit", "value": "10" },
-                { "key": "skip", "value": "0" }
-              ]
-            }
-          }
-        },
-        {
           "name": "Update Restaurant",
           "request": {
             "method": "PUT",
@@ -369,17 +339,6 @@
           }
         },
         {
-          "name": "List Menus By Restaurante (path)",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/menus/restaurante/{{restaurant_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["menus", "restaurante", "{{restaurant_id}}"]
-            }
-          }
-        },
-        {
           "name": "Get Menu By ID",
           "request": {
             "method": "GET",
@@ -412,12 +371,15 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"Pasta Carbonara\",\n  \"descripcion\": \"Pasta con huevo, queso y panceta\",\n  \"precio\": 8500,\n  \"categoria\": \"Pastas\",\n  \"tiempo_preparacion\": 20,\n  \"disponible\": true,\n  \"restaurante_id\": {{restaurant_id}}\n}"
+              "raw": "{\n  \"nombre\": \"Pasta Carbonara\",\n  \"descripcion\": \"Pasta con huevo, queso y panceta\",\n  \"precio\": 8500,\n  \"categoria\": \"Pastas\",\n  \"tiempo_preparacion\": 20,\n  \"disponible\": true\n}"
             },
             "url": {
-              "raw": "{{base_url}}/menus/",
+              "raw": "{{base_url}}/menus/?restaurante_id={{restaurant_id}}",
               "host": ["{{base_url}}"],
-              "path": ["menus", ""]
+              "path": ["menus", ""],
+              "query": [
+                { "key": "restaurante_id", "value": "{{restaurant_id}}" }
+              ]
             }
           }
         },
@@ -491,20 +453,6 @@
           }
         },
         {
-          "name": "Get Reservation By ID",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
-            ],
-            "url": {
-              "raw": "{{base_url}}/reservations/{{reservation_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["reservations", "{{reservation_id}}"]
-            }
-          }
-        },
-        {
           "name": "List My Reservations",
           "request": {
             "method": "GET",
@@ -532,7 +480,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"notas\": \"Actualizacion de notas\",\n  \"estado\": \"confirmada\",\n  \"numero_mesa\": 5\n}"
+              "raw": "{\n  \"notas\": \"Actualizacion de notas\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/reservations/{{reservation_id}}",
@@ -572,23 +520,6 @@
               ]
             }
           }
-        },
-        {
-          "name": "Confirm Reservation",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
-            ],
-            "url": {
-              "raw": "{{base_url}}/reservations/{{reservation_id}}/confirm?numero_mesa=5",
-              "host": ["{{base_url}}"],
-              "path": ["reservations", "{{reservation_id}}", "confirm"],
-              "query": [
-                { "key": "numero_mesa", "value": "5" }
-              ]
-            }
-          }
         }
       ]
     },
@@ -597,18 +528,6 @@
       "item": [
         {
           "name": "Create Order",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const res = pm.response.json();",
-                  "if (res.id) pm.collectionVariables.set('order_id', String(res.id));"
-                ]
-              }
-            }
-          ],
           "request": {
             "method": "POST",
             "header": [
@@ -617,12 +536,16 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"restaurante_id\": {{restaurant_id}},\n  \"items\": [\n    {\"menu_id\": {{menu_id}}, \"cantidad\": 2}\n  ],\n  \"tipo_entrega\": \"recogida\",\n  \"direccion_entrega\": null,\n  \"notas\": \"Sin cebolla\"\n}"
+              "raw": "{\n  \"cantidad\": 2,\n  \"tipo_entrega\": \"recogida\",\n  \"direccion_entrega\": null,\n  \"notas\": \"Sin cebolla\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/orders/",
+              "raw": "{{base_url}}/orders/?restaurante_id={{restaurant_id}}&menu_id={{menu_id}}",
               "host": ["{{base_url}}"],
-              "path": ["orders", ""]
+              "path": ["orders", ""],
+              "query": [
+                { "key": "restaurante_id", "value": "{{restaurant_id}}" },
+                { "key": "menu_id", "value": "{{menu_id}}" }
+              ]
             }
           }
         },
@@ -645,20 +568,6 @@
           }
         },
         {
-          "name": "Get Order By ID",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
-            ],
-            "url": {
-              "raw": "{{base_url}}/orders/{{order_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["orders", "{{order_id}}"]
-            }
-          }
-        },
-        {
           "name": "List My Orders",
           "request": {
             "method": "GET",
@@ -673,39 +582,6 @@
                 { "key": "limit", "value": "10" },
                 { "key": "skip", "value": "0" }
               ]
-            }
-          }
-        },
-        {
-          "name": "Update Order",
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"estado\": \"confirmado\",\n  \"notas\": \"Pedido actualizado\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/orders/{{order_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["orders", "{{order_id}}"]
-            }
-          }
-        },
-        {
-          "name": "Cancel Order",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
-            ],
-            "url": {
-              "raw": "{{base_url}}/orders/{{order_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["orders", "{{order_id}}"]
             }
           }
         }

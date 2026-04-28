@@ -10,6 +10,10 @@ class MenuBase(BaseModel):
     tiempo_preparacion: Optional[int] = Field(None, gt=0)  # en minutos
     categoria: Optional[str] = Field(None, max_length=100)
 
+# Request para crear un plato (restaurante_id se pasa por parámetro, no en el body)
+class MenuCreateRequest(MenuBase):
+    pass
+
 # Para crear un plato (requiere restaurante_id)
 class MenuCreate(MenuBase):
     restaurante_id: int

@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from app.database.session import get_db
-from app.schemas.menu import MenuCreate, MenuUpdate, MenuResponse
+from app.schemas.menu import MenuCreate, MenuCreateRequest, MenuUpdate, MenuResponse
 from app.services.menu_service import (
     get_menu,
     get_all_menus,
@@ -101,15 +101,6 @@ async def listar_menus(
         return get_menus_by_restaurante(db, restaurante_id)
     return get_all_menus(db)
 
-
-@router.get("/restaurante/{restaurante_id}", response_model=List[MenuResponse])
-async def listar_menus_restaurante(
-    restaurante_id: int,
-    db: Session = Depends(get_db)
-):
-    """Lista los menús de un restaurante por ID (ruta esperada por los tests)."""
-    return get_menus_by_restaurante(db, restaurante_id)
-
 @router.get("/{menu_id}", response_model=MenuResponse)
 async def obtener_menu(
     menu_id: int,
@@ -123,7 +114,8 @@ async def obtener_menu(
 
 @router.post("/", response_model=MenuResponse, status_code=201)
 async def crear_menu(
-    menu: MenuCreate,
+    menu: MenuCreateRequest,
+    restaurante_id: int = Query(..., gt=0),
     db: Session = Depends(get_db),
     payload: dict = Depends(verify_jwt)  # Requiere autenticación
 ):
@@ -133,14 +125,17 @@ async def crear_menu(
     """
     local_user = _require_admin_local_user(payload, db)
 
-    restaurante = get_restaurant(db, menu.restaurante_id)
+    restaurante = get_restaurant(db, restaurante_id)
     if not restaurante:
         raise HTTPException(status_code=404, detail="Restaurante no encontrado")
 
     if restaurante.admin_id != local_user.id:
         raise HTTPException(status_code=403, detail="No tiene permiso para crear menús en este restaurante")
 
-    nuevo_menu = create_menu(db, menu)
+    nuevo_menu = create_menu(
+        db,
+        MenuCreate(**menu.model_dump(), restaurante_id=restaurante_id),
+    )
     if not nuevo_menu:
         raise HTTPException(status_code=400, detail="Error al crear el menú")
     return nuevo_menu

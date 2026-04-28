@@ -4,13 +4,15 @@ from app.database.connection import Base
 from app.models.base import BaseModel
 import enum
 from datetime import datetime
+
+
+def _enum_values(enum_cls):
+    return [e.value for e in enum_cls]
  
 class EstadoReservaEnum(str, enum.Enum):
     """Estados posibles de una reserva"""
-    PENDIENTE = "pendiente"
-    CONFIRMADA = "confirmada"
+    RESERVADA = "reservada"
     CANCELADA = "cancelada"
-    COMPLETADA = "completada"
  
 class Reservation(BaseModel):
     """
@@ -57,8 +59,12 @@ class Reservation(BaseModel):
     )
     
     estado = Column(
-        Enum(EstadoReservaEnum),
-        default=EstadoReservaEnum.PENDIENTE,
+        Enum(
+            EstadoReservaEnum,
+            name="estadoreservaenum",
+            values_callable=_enum_values,
+        ),
+        default=EstadoReservaEnum.RESERVADA,
         nullable=False,
         index=True,
         doc="Estado actual de la reserva"

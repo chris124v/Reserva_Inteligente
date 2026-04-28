@@ -12,7 +12,6 @@ from app.services.restaurant_service import (
     get_restaurant,
     get_restaurant_by_email,
     get_all_restaurants,
-    get_restaurants_by_admin,
     create_restaurant,
     update_restaurant,
     delete_restaurant
@@ -141,54 +140,6 @@ async def listar_restaurantes(
     - **skip**: Número de registros a saltar para paginación
     """
     restaurants = get_all_restaurants(db)
-    
-    # Aplicar paginación
-    return restaurants[skip : skip + limit]
-
-
-@router.get("/{restaurant_id}", response_model=RestaurantResponse)
-async def obtener_restaurante(
-    restaurant_id: int,
-    db: Session = Depends(get_db)
-):
-    """
-    Obtiene los detalles de un restaurante específico.
-    No requiere autenticación.
-    """
-    db_restaurant = get_restaurant(db, restaurant_id)
-    
-    if not db_restaurant:
-        raise HTTPException(status_code=404, detail="Restaurante no encontrado")
-    
-    return db_restaurant
-
-
-@router.get("/admin/mis-restaurantes", response_model=list[RestaurantResponse])
-async def listar_mis_restaurantes(
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(verify_jwt),
-    limit: int = Query(10, ge=1, le=100),
-    skip: int = Query(0, ge=0)
-):
-    """
-    Obtiene todos los restaurantes administrados por el usuario autenticado.
-    
-    - **limit**: Número máximo de registros
-    - **skip**: Número de registros a saltar
-    """
-    admin_id = _resolve_current_local_user_id(current_user, db)
-    
-    if not admin_id:
-        raise HTTPException(status_code=401, detail="Usuario no autenticado")
-
-    admin_user = get_user(db, admin_id)
-    if not admin_user:
-        raise HTTPException(status_code=401, detail="Usuario no autenticado o no sincronizado en BD local")
-
-    if admin_user.rol != RoleEnum.ADMIN:
-        raise HTTPException(status_code=403, detail="Solo usuarios admin pueden acceder a esta ruta")
-    
-    restaurants = get_restaurants_by_admin(db, admin_id)
     
     # Aplicar paginación
     return restaurants[skip : skip + limit]

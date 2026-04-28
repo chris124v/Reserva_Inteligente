@@ -290,21 +290,19 @@ class TestOrderEndpoints:
     def test_crear_pedido_exitoso(self, client, test_db, create_test_data):
         """POST /orders/ debe crear un pedido."""
         # Arrange
-        user = create_test_data["create_user"](email="customer@test.com")
-        restaurant = create_test_data["create_restaurant"](admin_id=user.id)
+        create_test_data["create_user"](email="customer@test.com", rol="cliente")
+        restaurant = create_test_data["create_restaurant"](admin_id=1)
+        menu = create_test_data["create_menu"](restaurante_id=restaurant.id, precio=15.5)
         
         order_data = {
-            "restaurante_id": restaurant.id,
-            "items": [
-                {"menu_id": 1, "cantidad": 2}
-            ],
+            "cantidad": 2,
             "tipo_entrega": "en_restaurante",
             "notas": "Sin picante"
         }
         
         # Act
         response = client.post(
-            "/orders/",
+            f"/orders/?restaurante_id={restaurant.id}&menu_id={menu.id}",
             json=order_data,
             headers={"Authorization": "Bearer test-token"}
         )
@@ -314,54 +312,54 @@ class TestOrderEndpoints:
         data = response.json()
         assert data["usuario_id"] == 1  # El JWT mock retorna usuario_id=1
         assert data["restaurante_id"] == restaurant.id
+        assert len(data["items"]) == 1
+        assert data["items"][0]["menu_id"] == menu.id
+        assert data["items"][0]["cantidad"] == 2
+        assert data["subtotal"] == 31.0
+        assert data["impuesto"] == 0.0
+        assert data["total"] == 31.0
+
+
+    def test_crear_pedido_forbidden_si_es_admin(self, client, create_test_data):
+        """POST /orders/ debe prohibir crear pedido a admins."""
+        create_test_data["create_user"](email="admin@test.com", rol="admin")
+        restaurant = create_test_data["create_restaurant"](admin_id=1)
+        menu = create_test_data["create_menu"](restaurante_id=restaurant.id, precio=10.0)
+
+        response = client.post(
+            f"/orders/?restaurante_id={restaurant.id}&menu_id={menu.id}",
+            json={"cantidad": 1, "tipo_entrega": "recogida"},
+            headers={"Authorization": "Bearer test-token"}
+        )
+        assert response.status_code == 403
     
     def test_crear_pedido_sin_auth(self, client):
         """POST /orders/ debe requerir autenticación."""
         # Act
         response = client.post(
             "/orders/",
-            json={
-                "restaurante_id": 1,
-                "items": [{"menu_id": 1, "cantidad": 1}]
-            }
+            json={"cantidad": 1}
         )
         
         # Assert
         assert response.status_code == 401
-    
-    def test_obtener_pedido_exitoso(self, client, test_db, create_test_data):
-        """GET /orders/{id} debe obtener un pedido."""
-        # Arrange
+
+
+    def test_obtener_pedido_endpoint_eliminado(self, client, test_db, create_test_data):
+        """GET /orders/{id} ya no existe."""
         user = create_test_data["create_user"]()
         restaurant = create_test_data["create_restaurant"](admin_id=user.id)
-        
         order_data = OrderCreate(
             restaurante_id=restaurant.id,
             items=[OrderItem(menu_id=1, cantidad=1)],
             tipo_entrega=TipoEntregaEnum.RECOGIDA
         )
         order = create_order(test_db, order_data, user.id, 10.0, 2.0, 12.0)
-        
-        # Act
+
         response = client.get(
             f"/orders/{order.id}",
             headers={"Authorization": "Bearer test-token"}
         )
-        
-        # Assert
-        assert response.status_code == 200
-        data = response.json()
-        assert data["id"] == order.id
-        assert data["usuario_id"] == user.id
-    
-    def test_obtener_pedido_no_existe(self, client):
-        """GET /orders/{id} debe retornar 404 si no existe."""
-        # Act
-        response = client.get(
-            "/orders/999",
-            headers={"Authorization": "Bearer test-token"}
-        )
-        # Assert
         assert response.status_code == 404
     
     def test_listar_mis_pedidos(self, client, test_db, create_test_data):
@@ -388,91 +386,51 @@ class TestOrderEndpoints:
         assert response.status_code == 200
         data = response.json()
         assert len(data) >= 3
-    
-    def test_actualizar_pedido_exitoso(self, client, test_db, create_test_data):
-        """PUT /orders/{id} debe actualizar un pedido."""
-        # Arrange
+
+
+    def test_actualizar_pedido_endpoint_eliminado(self, client, test_db, create_test_data):
+        """PUT /orders/{id} ya no existe."""
         user = create_test_data["create_user"](email="customer@test.com")
         restaurant = create_test_data["create_restaurant"](admin_id=user.id)
-        
         order_data = OrderCreate(
             restaurante_id=restaurant.id,
             items=[OrderItem(menu_id=1, cantidad=1)],
             tipo_entrega=TipoEntregaEnum.RECOGIDA
         )
         order = create_order(test_db, order_data, user.id, 10.0, 2.0, 12.0)
-        
-        # Act
+
         response = client.put(
             f"/orders/{order.id}",
-            json={
-                "estado": "confirmado",
-                "notas": "Confirmado por cliente"
-            },
-            headers={"Authorization": "Bearer test-token"}
-        )
-        
-        # Assert
-        assert response.status_code == 200
-        data = response.json()
-        assert data["estado"] == "confirmado"
-        assert data["notas"] == "Confirmado por cliente"
-    
-    def test_actualizar_pedido_no_existe(self, client):
-        """PUT /orders/{id} debe retornar 404 si no existe."""
-        # Act
-        response = client.put(
-            "/orders/999",
             json={"estado": "confirmado"},
             headers={"Authorization": "Bearer test-token"}
         )
-        
-        # Assert
         assert response.status_code == 404
-    
-    def test_cancelar_pedido_exitoso(self, client, test_db, create_test_data):
-        """DELETE /orders/{id} debe cancelar un pedido."""
-        # Arrange
+
+
+    def test_cancelar_pedido_endpoint_eliminado(self, client, test_db, create_test_data):
+        """DELETE /orders/{id} ya no existe."""
         user = create_test_data["create_user"](email="customer@test.com")
         restaurant = create_test_data["create_restaurant"](admin_id=user.id)
-        
         order_data = OrderCreate(
             restaurante_id=restaurant.id,
             items=[OrderItem(menu_id=1, cantidad=1)],
             tipo_entrega=TipoEntregaEnum.RECOGIDA
         )
         order = create_order(test_db, order_data, user.id, 10.0, 2.0, 12.0)
-        
-        # Act
+
         response = client.delete(
             f"/orders/{order.id}",
             headers={"Authorization": "Bearer test-token"}
         )
-        
-        # Assert
-        assert response.status_code == 204
-        
-        # Verificar que fue cancelado
-        updated = get_order(test_db, order.id)
-        assert updated.estado == EstadoPedidoEnum.CANCELADO
-    
-    def test_cancelar_pedido_no_existe(self, client):
-        """DELETE /orders/{id} debe retornar 404 si no existe."""
-        # Act
-        response = client.delete(
-            "/orders/999",
-            headers={"Authorization": "Bearer test-token"}
-        )
-        
-        # Assert
         assert response.status_code == 404
     
     def test_listar_pedidos_restaurante(self, client, test_db, create_test_data):
         """GET /orders/restaurante/{id} debe listar pedidos del restaurante."""
         # Arrange
-        user1 = create_test_data["create_user"](email="user1@test.com")
-        user2 = create_test_data["create_user"](email="user2@test.com")
-        restaurant = create_test_data["create_restaurant"](admin_id=user1.id)
+        admin_owner = create_test_data["create_user"](email="admin_owner@test.com", rol="admin")
+        user1 = create_test_data["create_user"](email="user1@test.com", rol="cliente")
+        user2 = create_test_data["create_user"](email="user2@test.com", rol="cliente")
+        restaurant = create_test_data["create_restaurant"](admin_id=admin_owner.id)
         
         for user in [user1, user2]:
             order_data = OrderCreate(
@@ -492,23 +450,48 @@ class TestOrderEndpoints:
         assert response.status_code == 200
         data = response.json()
         assert len(data) >= 2
+
+
+    def test_listar_pedidos_restaurante_forbidden_si_no_es_dueno(self, client, test_db, create_test_data):
+        """GET /orders/restaurante/{id} debe prohibir a admin no dueño."""
+        admin1 = create_test_data["create_user"](email="admin1@test.com", rol="admin")
+        admin2 = create_test_data["create_user"](email="admin2@test.com", rol="admin")
+        restaurant = create_test_data["create_restaurant"](admin_id=admin2.id)
+
+        response = client.get(
+            f"/orders/restaurante/{restaurant.id}",
+            headers={"Authorization": "Bearer test-token"}
+        )
+        assert response.status_code == 403
+
+
+    def test_listar_pedidos_restaurante_forbidden_si_es_cliente(self, client, test_db, create_test_data):
+        """GET /orders/restaurante/{id} debe prohibir a clientes."""
+        cliente = create_test_data["create_user"](email="cliente@test.com", rol="cliente")
+        restaurant = create_test_data["create_restaurant"](admin_id=cliente.id)
+
+        response = client.get(
+            f"/orders/restaurante/{restaurant.id}",
+            headers={"Authorization": "Bearer test-token"}
+        )
+        assert response.status_code == 403
     
     def test_crear_pedido_domicilio_sin_direccion(self, client, test_db, create_test_data):
         """POST /orders/ debe rechazar DOMICILIO sin dirección."""
         # Arrange
-        user = create_test_data["create_user"]()
-        restaurant = create_test_data["create_restaurant"](admin_id=user.id)
+        create_test_data["create_user"](rol="cliente")
+        restaurant = create_test_data["create_restaurant"](admin_id=1)
+        menu = create_test_data["create_menu"](restaurante_id=restaurant.id, precio=10.0)
         
         order_data = {
-            "restaurante_id": restaurant.id,
-            "items": [{"menu_id": 1, "cantidad": 1}],
+            "cantidad": 1,
             "tipo_entrega": "domicilio"
             # Sin direccion_entrega
         }
         
         # Act
         response = client.post(
-            "/orders/",
+            f"/orders/?restaurante_id={restaurant.id}&menu_id={menu.id}",
             json=order_data,
             headers={"Authorization": "Bearer test-token"}
         )

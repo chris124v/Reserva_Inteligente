@@ -4,15 +4,15 @@ from app.database.session import get_db
 from app.auth.middleware import verify_jwt
 from app.auth.cognito import CognitoClient
 from app.config import settings
-from app.schemas.order import OrderCreate, OrderUpdate, OrderResponse
-from app.services.user_service import get_user_by_email
+from app.schemas.order import OrderCreate, OrderCreateRequest, OrderItem, OrderResponse
+from app.services.user_service import get_user, get_user_by_email
+from app.services.restaurant_service import get_restaurant
+from app.services.menu_service import get_menu
+from app.models.user import RoleEnum
 from app.services.order_service import (
-    get_order,
     get_orders_by_usuario,
     get_orders_by_restaurante,
     create_order,
-    update_order_estado,
-    cancel_order
 )
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -71,15 +71,20 @@ def _resolve_current_local_user_id(current_user: dict, db: Session) -> int | Non
 
 @router.post("/", response_model=OrderResponse, status_code=201)
 async def crear_pedido(
-    order_data: OrderCreate,
+    order_data: OrderCreateRequest,
+    restaurante_id: int = Query(..., ge=1),
+    menu_id: int = Query(..., ge=1),
     db: Session = Depends(get_db),
     current_user: dict = Depends(verify_jwt)
 ):
     """
     Crea un nuevo pedido para el usuario autenticado.
     
-    - **restaurante_id**: ID del restaurante
-    - **items**: Lista de items del pedido (menu_id, cantidad)
+    Solo lo pueden crear los clientes.
+
+    - **restaurante_id**: ID del restaurante (query param)
+    - **menu_id**: ID del menú (query param)
+    - **cantidad**: Cantidad del menú (body)
     - **tipo_entrega**: RECOGIDA, DOMICILIO, EN_RESTAURANTE
     - **direccion_entrega**: Requerida si tipo_entrega es DOMICILIO
     - **notas**: Notas adicionales (opcional)
@@ -90,26 +95,52 @@ async def crear_pedido(
         
         if not usuario_id:
             raise HTTPException(status_code=401, detail="Usuario no autenticado")
+
+        local_user = get_user(db, usuario_id)
+        if not local_user:
+            raise HTTPException(status_code=401, detail="Usuario no autenticado o no sincronizado en BD local")
+
+        if local_user.rol != RoleEnum.CLIENTE:
+            raise HTTPException(status_code=403, detail="Solo clientes pueden crear pedidos")
+
+        # Construir el pedido interno (manteniendo el schema existente)
+        order_to_create = OrderCreate(
+            restaurante_id=restaurante_id,
+            items=[OrderItem(menu_id=menu_id, cantidad=order_data.cantidad)],
+            tipo_entrega=order_data.tipo_entrega,
+            direccion_entrega=order_data.direccion_entrega,
+            notas=order_data.notas,
+        )
         
         # Validar dirección de entrega si es domicilio
-        if order_data.tipo_entrega.value == "domicilio" and not order_data.direccion_entrega:
+        if order_to_create.tipo_entrega.value == "domicilio" and not order_to_create.direccion_entrega:
             raise HTTPException(
                 status_code=400,
                 detail="La dirección de entrega es requerida para tipo DOMICILIO"
             )
-        
-        # TODO: Validar que el restaurante existe
-        # TODO: Validar que los items/menús existen y calcular precios
-        
-        # Cálculo simple de totales (esto debería venir del servicio)
-        subtotal = 0.0
+
+        restaurante = get_restaurant(db, restaurante_id)
+        if not restaurante:
+            raise HTTPException(status_code=404, detail="Restaurante no encontrado")
+
+        menu = get_menu(db, menu_id)
+        if not menu:
+            raise HTTPException(status_code=404, detail="Menu no encontrado")
+
+        if menu.restaurante_id != restaurante_id:
+            raise HTTPException(status_code=400, detail="El menu no pertenece a este restaurante")
+
+        if not menu.disponible:
+            raise HTTPException(status_code=400, detail="El menu no está disponible")
+
+        subtotal = round(float(menu.precio) * int(order_data.cantidad), 2)
         impuesto = 0.0
-        total = 0.0
+        total = subtotal
         
         # Crear el pedido
         db_order = create_order(
             db=db,
-            order=order_data,
+            order=order_to_create,
             usuario_id=usuario_id,
             subtotal=subtotal,
             impuesto=impuesto,
@@ -139,38 +170,28 @@ async def listar_pedidos_restaurante(
     - **limit**: Número máximo de registros
     - **skip**: Número de registros a saltar
     """
-    # TODO: Validar que el usuario es dueño del restaurante
+    usuario_id = _resolve_current_local_user_id(current_user, db)
+    if not usuario_id:
+        raise HTTPException(status_code=401, detail="Usuario no autenticado")
+
+    local_user = get_user(db, usuario_id)
+    if not local_user:
+        raise HTTPException(status_code=401, detail="Usuario no autenticado o no sincronizado en BD local")
+
+    if local_user.rol != RoleEnum.ADMIN:
+        raise HTTPException(status_code=403, detail="Solo admins pueden ver pedidos por restaurante")
+
+    restaurante = get_restaurant(db, restaurante_id)
+    if not restaurante:
+        raise HTTPException(status_code=404, detail="Restaurante no encontrado")
+
+    if restaurante.admin_id != local_user.id:
+        raise HTTPException(status_code=403, detail="No tiene permiso para ver los pedidos de este restaurante")
     
     orders = get_orders_by_restaurante(db, restaurante_id)
     
     # Aplicar paginación
     return orders[skip : skip + limit]
-
-@router.get("/{order_id}", response_model=OrderResponse)
-async def obtener_pedido(
-    order_id: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(verify_jwt)
-):
-    """
-    Obtiene los detalles de un pedido específico.
-    El usuario solo puede ver sus propios pedidos o si es dueño del restaurante.
-    """
-    db_order = get_order(db, order_id)
-    
-    if not db_order:
-        raise HTTPException(status_code=404, detail="Pedido no encontrado")
-    
-    # Validar permiso: el usuario es dueño del pedido o del restaurante
-    usuario_id = _resolve_current_local_user_id(current_user, db)
-    if not usuario_id:
-        raise HTTPException(status_code=401, detail="Usuario no autenticado")
-
-    # TODO: Validar si es dueño del restaurante
-    if db_order.usuario_id != usuario_id:
-        raise HTTPException(status_code=403, detail="No tiene permiso para ver este pedido")
-    
-    return db_order
 
 
 @router.get("/", response_model=list[OrderResponse])
@@ -194,74 +215,5 @@ async def listar_mis_pedidos(
     
     # Aplicar paginación (esto debería hacerse en el servicio)
     return orders[skip : skip + limit]
-
-
-@router.put("/{order_id}", response_model=OrderResponse)
-async def actualizar_pedido(
-    order_id: int,
-    order_update: OrderUpdate,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(verify_jwt)
-):
-    """
-    Actualiza el estado y/o notas de un pedido.
-    Solo el usuario que creó el pedido puede actualizarlo.
-    
-    - **estado**: PENDIENTE, CONFIRMADO, EN_PREPARACION, LISTO, ENTREGADO, CANCELADO
-    - **notas**: Notas adicionales (opcional)
-    """
-    db_order = get_order(db, order_id)
-    
-    if not db_order:
-        raise HTTPException(status_code=404, detail="Pedido no encontrado")
-    
-    # Validar permiso
-    usuario_id = _resolve_current_local_user_id(current_user, db)
-    if not usuario_id:
-        raise HTTPException(status_code=401, detail="Usuario no autenticado")
-
-    if db_order.usuario_id != usuario_id:
-        raise HTTPException(status_code=403, detail="No tiene permiso para actualizar este pedido")
-    
-    # Actualizar
-    updated_order = update_order_estado(db, order_id, order_update)
-    
-    return updated_order
-
-
-@router.delete("/{order_id}", status_code=204)
-async def cancelar_pedido(
-    order_id: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(verify_jwt)
-):
-    """
-    Cancela un pedido.
-    Solo pedidos en estado PENDIENTE o CONFIRMADO pueden ser cancelados.
-    """
-    db_order = get_order(db, order_id)
-    
-    if not db_order:
-        raise HTTPException(status_code=404, detail="Pedido no encontrado")
-    
-    # Validar permiso
-    usuario_id = _resolve_current_local_user_id(current_user, db)
-    if not usuario_id:
-        raise HTTPException(status_code=401, detail="Usuario no autenticado")
-
-    if db_order.usuario_id != usuario_id:
-        raise HTTPException(status_code=403, detail="No tiene permiso para cancelar este pedido")
-    
-    # Validar estado
-    if db_order.estado.value not in ["pendiente", "confirmado"]:
-        raise HTTPException(
-            status_code=400,
-            detail=f"No se puede cancelar un pedido en estado {db_order.estado.value}"
-        )
-    
-    # Cancelar
-    cancel_order(db, order_id)
-    
-    return None
 
 

@@ -7,10 +7,9 @@ def test_menu_create_ok_si_admin_dueno(client, create_test_data, test_db, auth_h
         "descripcion": "Desc",
         "precio": 10.0,
         "disponible": True,
-        "restaurante_id": restaurant.id,
     }
 
-    r = client.post("/menus/", json=payload, headers=auth_headers)
+    r = client.post(f"/menus/?restaurante_id={restaurant.id}", json=payload, headers=auth_headers)
     assert r.status_code == 201
     body = r.json()
     assert body["restaurante_id"] == restaurant.id
@@ -24,10 +23,9 @@ def test_menu_create_forbidden_si_admin_no_es_dueno(client, create_test_data, au
     payload = {
         "nombre": "Pizza",
         "precio": 12.0,
-        "restaurante_id": restaurant.id,
     }
 
-    r = client.post("/menus/", json=payload, headers=auth_headers)
+    r = client.post(f"/menus/?restaurante_id={restaurant.id}", json=payload, headers=auth_headers)
     assert r.status_code == 403
 
 
@@ -38,8 +36,7 @@ def test_menu_create_forbidden_si_cliente(client, create_test_data, auth_headers
     payload = {
         "nombre": "Taco",
         "precio": 5.0,
-        "restaurante_id": restaurant.id,
     }
 
-    r = client.post("/menus/", json=payload, headers=auth_headers)
+    r = client.post(f"/menus/?restaurante_id={restaurant.id}", json=payload, headers=auth_headers)
     assert r.status_code == 403

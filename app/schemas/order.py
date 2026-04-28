@@ -7,6 +7,14 @@ class OrderItem(BaseModel):
     menu_id: int
     cantidad: int = Field(..., gt=0)
 
+
+# Request simplificado para crear pedido (IDs van por query params)
+class OrderCreateRequest(BaseModel):
+    cantidad: int = Field(1, gt=0)
+    tipo_entrega: TipoEntregaEnum = TipoEntregaEnum.RECOGIDA
+    direccion_entrega: Optional[str] = Field(None, max_length=500)
+    notas: Optional[str] = Field(None, max_length=500)
+
 # Base con los campos comunes
 class OrderBase(BaseModel):
     restaurante_id: int
