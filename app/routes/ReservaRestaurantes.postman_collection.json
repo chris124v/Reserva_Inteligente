@@ -27,7 +27,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"usuario@example.com\",\n  \"password\": \"Contrasena123!\",\n  \"nombre\": \"Juan Perez\"\n}"
+              "raw": "{\n  \"email\": \"usuario@example.com\",\n  \"password\": \"Contrasena123!\",\n  \"nombre\": \"Juan Perez\",\n  \"rol\": \"cliente\",\n  \"admin_code\": null\n}"
             },
             "url": {
               "raw": "{{base_url}}/auth/register",
@@ -105,24 +105,6 @@
       "name": "Users",
       "item": [
         {
-          "name": "Create User (Local DB)",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"usuario@example.com\",\n  \"nombre\": \"Juan Perez\",\n  \"password\": \"Contrasena123!\",\n  \"rol\": \"cliente\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/users/",
-              "host": ["{{base_url}}"],
-              "path": ["users", ""]
-            }
-          }
-        },
-        {
           "name": "Get My Profile",
           "event": [
             {
@@ -167,17 +149,6 @@
           }
         },
         {
-          "name": "Get User By ID",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/users/{{user_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["users", "{{user_id}}"]
-            }
-          }
-        },
-        {
           "name": "Update User",
           "request": {
             "method": "PUT",
@@ -187,7 +158,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"Nombre Actualizado\",\n  \"email\": \"nuevo@example.com\",\n  \"activo\": true\n}"
+              "raw": "{\n  \"nombre\": \"Nombre Actualizado\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/users/{{user_id}}",
@@ -207,20 +178,6 @@
               "raw": "{{base_url}}/users/{{user_id}}",
               "host": ["{{base_url}}"],
               "path": ["users", "{{user_id}}"]
-            }
-          }
-        },
-        {
-          "name": "Activate User",
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
-            ],
-            "url": {
-              "raw": "{{base_url}}/users/{{user_id}}/activate",
-              "host": ["{{base_url}}"],
-              "path": ["users", "{{user_id}}", "activate"]
             }
           }
         }
