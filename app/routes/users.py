@@ -12,114 +12,14 @@ from app.services.user_service import (
     get_all_users,
     update_user,
     deactivate_user,
+    resolve_current_local_user,
+    resolve_current_local_user_id,
+    resolve_current_user_email,
 )
 
 router = APIRouter(prefix="/users", tags=["users"])
 cognito_client = CognitoClient()
 
-
-def _resolve_cognito_username(current_user: dict) -> str | None:
-    # En access tokens suele venir como `username`; en id tokens como `cognito:username`.
-    return current_user.get("username") or current_user.get("cognito:username")
-
-
-def _extract_email_from_cognito_user(user_response: dict) -> str | None:
-    attrs = user_response.get("UserAttributes", [])
-    for attr in attrs:
-        if attr.get("Name") == "email":
-            return attr.get("Value")
-    return None
-
-
-def _resolve_current_user_email(current_user: dict) -> str | None:
-    # Algunos tokens (id token) incluyen email directamente
-    email = current_user.get("email")
-    if email:
-        return email
-
-    username = _resolve_cognito_username(current_user)
-    if not username:
-        return None
-
-    # En algunos pools el username es el email
-    if "@" in username:
-        return username
-
-    # Si username/sub es UUID, consultamos Cognito para obtener email
-    try:
-        user_response = cognito_client.client.admin_get_user(
-            UserPoolId=settings.COGNITO_USER_POOL_ID,
-            Username=username,
-        )
-        return _extract_email_from_cognito_user(user_response)
-    except Exception:
-        return None
-
-
-def _resolve_current_local_user_id(current_user: dict, db: Session) -> int | None:
-    """
-    Resuelve el ID del usuario local (tabla users) a partir del JWT.
-
-    Prioriza `usuario_id` cuando existe y, para tokens de Cognito,
-    usa `username/sub` -> admin_get_user -> email -> usuario local.
-    """
-    raw_user_id = current_user.get("usuario_id")
-    if raw_user_id is not None:
-        try:
-            return int(raw_user_id)
-        except (TypeError, ValueError):
-            pass
-
-    # Compatibilidad: si por alguna razon llega sub numérico
-    raw_numeric_id = current_user.get("sub")
-    if raw_numeric_id is not None:
-        try:
-            return int(raw_numeric_id)
-        except (TypeError, ValueError):
-            pass
-
-    email = _resolve_current_user_email(current_user)
-    if email:
-        local_user = get_user_by_email(db, email)
-        if local_user:
-            return local_user.id
-
-    username = _resolve_cognito_username(current_user)
-    if not username:
-        return None
-
-    try:
-        user_response = cognito_client.client.admin_get_user(
-            UserPoolId=settings.COGNITO_USER_POOL_ID,
-            Username=username,
-        )
-    except Exception:
-        # Fallback: algunos flujos usan el email como username en Cognito
-        local_user = get_user_by_email(db, username)
-        return local_user.id if local_user else None
-
-    email = _extract_email_from_cognito_user(user_response)
-    if not email:
-        return None
-
-    local_user = get_user_by_email(db, email)
-    return local_user.id if local_user else None
-
-
-def _resolve_current_local_user(current_user: dict, db: Session) -> User | None:
-    user_id = _resolve_current_local_user_id(current_user, db)
-    if user_id is not None:
-        user = get_user(db, user_id)
-        if user:
-            return user
-
-    email = _resolve_current_user_email(current_user)
-    if email:
-        user = get_user_by_email(db, email)
-        if user:
-            return user
-
-    return None
 
 @router.get("/", response_model=list[UserResponse])
 async def listar_usuarios(
@@ -132,8 +32,8 @@ async def listar_usuarios(
     Obtiene la lista de todos los usuarios.
     Requiere autenticación.
     
-    - **limit**: Número máximo de registros (default: 10, máximo: 100)
-    - **skip**: Número de registros a saltar para paginación
+    - limit: Número máximo de registros (default: 10, máximo: 100)
+    - skip: Número de registros a saltar para paginación
     """
     users = get_all_users(db)
     
@@ -149,7 +49,7 @@ async def obtener_mi_perfil(
     Obtiene el perfil del usuario autenticado.
     Requiere token JWT válido.
     """
-    db_user = _resolve_current_local_user(current_user, db)
+    db_user = resolve_current_local_user(current_user, db)
 
     if not db_user:
         raise HTTPException(
@@ -173,11 +73,6 @@ async def actualizar_usuario(
     
     Un usuario puede actualizar su propio perfil.
     Los admins solo pueden actualizar otros perfiles si presentan el código master.
-    
-    Campos actualizables:
-    - **nombre**: Nombre del usuario
-    - **email**: Email (debe ser único)
-    - **activo**: Estado del usuario (solo admin)
     """
     db_user = get_user(db, user_id)
     
@@ -185,12 +80,12 @@ async def actualizar_usuario(
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
     # Validar permisos (owner o admin)
-    current_local_user = _resolve_current_local_user(current_user, db)
+    current_local_user = resolve_current_local_user(current_user, db)
     current_user_id = current_local_user.id if current_local_user else None
     current_user_email = (
         current_local_user.email
         if current_local_user is not None
-        else _resolve_current_user_email(current_user)
+        else resolve_current_user_email(current_user)
     )
     is_admin = current_local_user is not None and current_local_user.rol == RoleEnum.ADMIN
 
@@ -198,7 +93,7 @@ async def actualizar_usuario(
     is_owner_by_email = current_user_email is not None and db_user.email.lower() == current_user_email.lower()
     is_owner = is_owner_by_id or is_owner_by_email
 
-    # Fallback: si no podemos resolver usuario local (p. ej. email cambió y el token quedó viejo),
+    # Fallback: si no podemos resolver usuario local (p. ej. email cambio y el token quedó viejo),
     # verificamos identidad con el `sub` del access token contra Cognito.
     if not is_owner and current_local_user is None:
         token_sub = current_user.get("sub")
@@ -211,7 +106,7 @@ async def actualizar_usuario(
                 # Si Cognito no está disponible o falla, mantenemos la decisión original.
                 pass
 
-    # Cualquier usuario autenticado puede actualizar SU propio perfil.
+    # Cualquier usuario autenticado puede actualizar su propio perfil.
     # Para actualizar a otra persona, debe ser admin y presentar master code.
     if not is_owner and not is_admin:
         if current_user_id is None and current_user_email is None:
@@ -221,16 +116,14 @@ async def actualizar_usuario(
             )
         raise HTTPException(status_code=403, detail="No tiene permiso para actualizar este usuario")
 
-    # Admin: para actualizar a OTRO usuario requiere código master.
+    # Admin: para actualizar a otro usuario requiere código master.
     if is_admin and not is_owner:
         if not settings.MASTER_ADMIN_CODE:
             raise HTTPException(status_code=403, detail="MASTER_ADMIN_CODE no configurado")
         if not master_admin_code or master_admin_code != settings.MASTER_ADMIN_CODE:
             raise HTTPException(status_code=403, detail="Código master admin inválido")
 
-    # Solo master puede MODIFICAR el estado 'activo' (si realmente cambia).
-    # Nota: Swagger a veces manda `activo` aunque no se esté editando;
-    # en ese caso no debemos bloquear el update.
+    # Solo master puede modificar el estado 'activo' (si realmente cambia).
     if user_update.activo is not None and user_update.activo != db_user.activo:
         if not is_admin:
             raise HTTPException(status_code=403, detail="No tiene permiso para modificar el estado del usuario")
@@ -274,8 +167,7 @@ async def eliminar_usuario(
     Un usuario puede eliminar su propia cuenta.
     Los admins solo pueden eliminar otras cuentas si presentan el código master.
     
-    NOTA: Esto desactiva el usuario, no lo elimina físicamente,
-    para conservar el historial de reservas y pedidos.
+    Se desactiva el usuario
     """
     db_user = get_user(db, user_id)
     
@@ -283,9 +175,9 @@ async def eliminar_usuario(
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
     # Validar permisos (dueno o admin)
-    current_local_user = _resolve_current_local_user(current_user, db)
+    current_local_user = resolve_current_local_user(current_user, db)
     current_user_id = current_local_user.id if current_local_user else None
-    current_user_email = current_local_user.email if current_local_user else _resolve_current_user_email(current_user)
+    current_user_email = current_local_user.email if current_local_user else resolve_current_user_email(current_user)
     is_admin = current_local_user is not None and current_local_user.rol == RoleEnum.ADMIN
 
     is_owner_by_id = current_user_id is not None and db_user.id == current_user_id
@@ -306,7 +198,7 @@ async def eliminar_usuario(
 
     is_owner = is_owner_by_id or is_owner_by_email
 
-    # Admin: para desactivar a OTRO usuario requiere código master.
+    # Admin: para desactivar a otro usuario requiere código master.
     if is_admin and not is_owner:
         if not settings.MASTER_ADMIN_CODE:
             raise HTTPException(status_code=403, detail="MASTER_ADMIN_CODE no configurado")

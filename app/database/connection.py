@@ -4,7 +4,7 @@ from sqlalchemy.orm import declarative_base #Base para definir modelos ORM
 import os
 from dotenv import load_dotenv
 
-#Archivo de conexión a la base de datos. Aquí se configura el engine y la base para las
+#Archivo de conexión a la base de datos. Aquí se configura el engine y la base 
 
 # Cargar variables de entorno
 load_dotenv()
@@ -25,6 +25,6 @@ engine = create_engine(
     echo=False                # True para ver logs SQL (desarrollo)
 )
 
-# Base para los modelos osea las tablas de la BD
+# Base para los modelos osea las tablas de la Bd
 Base = declarative_base()
 

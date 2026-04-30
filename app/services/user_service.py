@@ -1,6 +1,8 @@
 from sqlalchemy.orm import Session
 from app.models.user import User, RoleEnum
 from app.schemas.user import UserCreate, UserUpdate
+from app.auth.cognito import CognitoClient
+from app.config import settings
 
 def get_user(db: Session, user_id: int):
     """Busca un usuario por su ID. Retorna None si no existe."""
@@ -96,3 +98,135 @@ def deactivate_user(db: Session, user_id: int):
     db.commit()
     db.refresh(db_user)
     return db_user
+
+
+# Funciones de resolucion (JWT -> Usuario Local)
+
+_cognito_client = CognitoClient()
+
+
+def extract_email_from_cognito_user(user_response: dict) -> str | None:
+    """Extrae el email del response de admin_get_user de Cognito."""
+    attrs = user_response.get("UserAttributes", [])
+    for attr in attrs:
+        if attr.get("Name") == "email":
+            return attr.get("Value")
+    return None
+
+
+def resolve_cognito_username(current_user: dict) -> str | None:
+    """
+    Resuelve el username de Cognito desde el JWT.
+    En access tokens suele venir como 'username'; en id tokens como 'cognito:username'.
+    """
+    return current_user.get("username") or current_user.get("cognito:username")
+
+
+def resolve_current_user_email(current_user: dict) -> str | None:
+    """
+    Resuelve el email del usuario desde el JWT.
+    
+    Prioridad:
+    1. Email directo en el token
+    2. Username que contiene @ (es email)
+    3. Consultar Cognito con username para obtener email
+    """
+    # Algunos tokens (id token) incluyen email directamente
+    email = current_user.get("email")
+    if email:
+        return email
+
+    username = resolve_cognito_username(current_user)
+    if not username:
+        return None
+
+    # En algunos pools el username es el email
+    if "@" in username:
+        return username
+
+    # Si username es UUID, consultamos Cognito para obtener email
+    try:
+        user_response = _cognito_client.client.admin_get_user(
+            UserPoolId=settings.COGNITO_USER_POOL_ID,
+            Username=username,
+        )
+        return extract_email_from_cognito_user(user_response)
+    except Exception:
+        return None
+
+
+def resolve_current_local_user_id(current_user: dict, db: Session) -> int | None:
+    """
+    Resuelve el ID del usuario local (tabla users) a partir del JWT.
+
+    Prioridad:
+    1. usuario_id directo en el token
+    2. sub numérico (compatibilidad)
+    3. Email del token -> búsqueda en BD local
+    4. Username del token -> Cognito -> email -> BD local
+    """
+    raw_user_id = current_user.get("usuario_id")
+    if raw_user_id is not None:
+        try:
+            return int(raw_user_id)
+        except (TypeError, ValueError):
+            pass
+
+    # Compatibilidad: si por alguna razón llega sub numérico
+    raw_numeric_id = current_user.get("sub")
+    if raw_numeric_id is not None:
+        try:
+            return int(raw_numeric_id)
+        except (TypeError, ValueError):
+            pass
+
+    # Intentar con email
+    email = resolve_current_user_email(current_user)
+    if email:
+        local_user = get_user_by_email(db, email)
+        if local_user:
+            return local_user.id
+
+    # Fallback: intentar con username + Cognito
+    username = resolve_cognito_username(current_user)
+    if not username:
+        return None
+
+    try:
+        user_response = _cognito_client.client.admin_get_user(
+            UserPoolId=settings.COGNITO_USER_POOL_ID,
+            Username=username,
+        )
+        email = extract_email_from_cognito_user(user_response)
+        if email:
+            local_user = get_user_by_email(db, email)
+            if local_user:
+                return local_user.id
+    except Exception:
+        # Si Cognito falla, intentar email como username (algunos flujos)
+        local_user = get_user_by_email(db, username)
+        return local_user.id if local_user else None
+
+    return None
+
+
+def resolve_current_local_user(current_user: dict, db: Session) -> User | None:
+    """
+    Resuelve el objeto User local desde el JWT.
+    
+    Intenta primero por ID, luego por email.
+    Retorna None si no encuentra el usuario.
+    """
+    user_id = resolve_current_local_user_id(current_user, db)
+    if user_id is not None:
+        user = get_user(db, user_id)
+        if user:
+            return user
+
+    email = resolve_current_user_email(current_user)
+    if email:
+        user = get_user_by_email(db, email)
+        if user:
+            return user
+
+    return None

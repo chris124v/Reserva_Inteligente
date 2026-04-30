@@ -5,7 +5,11 @@ from app.auth.middleware import verify_jwt
 from app.auth.cognito import CognitoClient
 from app.config import settings
 from app.schemas.order import OrderCreate, OrderCreateRequest, OrderItem, OrderResponse
-from app.services.user_service import get_user, get_user_by_email
+from app.services.user_service import (
+    get_user,
+    get_user_by_email,
+    resolve_current_local_user_id,
+)
 from app.services.restaurant_service import get_restaurant
 from app.services.menu_service import get_menu
 from app.models.user import RoleEnum
@@ -17,56 +21,6 @@ from app.services.order_service import (
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 cognito_client = CognitoClient()
-
-
-def _extract_email_from_cognito_user(user_response: dict) -> str | None:
-    for attr in user_response.get("UserAttributes", []):
-        if attr.get("Name") == "email":
-            return attr.get("Value")
-    return None
-
-
-def _resolve_current_local_user_id(current_user: dict, db: Session) -> int | None:
-    raw_user_id = current_user.get("usuario_id")
-    if raw_user_id is not None:
-        try:
-            return int(raw_user_id)
-        except (TypeError, ValueError):
-            pass
-
-    raw_numeric_id = current_user.get("sub") or current_user.get("username")
-    if raw_numeric_id is not None:
-        try:
-            return int(raw_numeric_id)
-        except (TypeError, ValueError):
-            pass
-
-    email = current_user.get("email")
-    if email:
-        local_user = get_user_by_email(db, email)
-        if local_user:
-            return local_user.id
-
-    username = current_user.get("username") or current_user.get("sub")
-    if not username:
-        return None
-
-    if "@" in username:
-        local_user = get_user_by_email(db, username)
-        return local_user.id if local_user else None
-
-    try:
-        user_response = cognito_client.client.admin_get_user(
-            UserPoolId=settings.COGNITO_USER_POOL_ID,
-            Username=username,
-        )
-        email = _extract_email_from_cognito_user(user_response)
-        if not email:
-            return None
-        local_user = get_user_by_email(db, email)
-        return local_user.id if local_user else None
-    except Exception:
-        return None
 
 
 @router.post("/", response_model=OrderResponse, status_code=201)
@@ -81,17 +35,10 @@ async def crear_pedido(
     Crea un nuevo pedido para el usuario autenticado.
     
     Solo lo pueden crear los clientes.
-
-    - **restaurante_id**: ID del restaurante (query param)
-    - **menu_id**: ID del menú (query param)
-    - **cantidad**: Cantidad del menú (body)
-    - **tipo_entrega**: RECOGIDA, DOMICILIO, EN_RESTAURANTE
-    - **direccion_entrega**: Requerida si tipo_entrega es DOMICILIO
-    - **notas**: Notas adicionales (opcional)
     """
     try:
         # Obtener usuario_id del JWT
-        usuario_id = _resolve_current_local_user_id(current_user, db)
+        usuario_id = resolve_current_local_user_id(current_user, db)
         
         if not usuario_id:
             raise HTTPException(status_code=401, detail="Usuario no autenticado")
@@ -165,12 +112,8 @@ async def listar_pedidos_restaurante(
     """
     Obtiene todos los pedidos de un restaurante.
     Solo el dueño del restaurante puede ver esta información.
-    
-    - **restaurante_id**: ID del restaurante
-    - **limit**: Número máximo de registros
-    - **skip**: Número de registros a saltar
     """
-    usuario_id = _resolve_current_local_user_id(current_user, db)
+    usuario_id = resolve_current_local_user_id(current_user, db)
     if not usuario_id:
         raise HTTPException(status_code=401, detail="Usuario no autenticado")
 
@@ -203,17 +146,13 @@ async def listar_mis_pedidos(
 ):
     """
     Obtiene todos los pedidos del usuario autenticado.
-    
-    - **limit**: Número máximo de registros (default: 10, máximo: 100)
-    - **skip**: Número de registros a saltar para paginación
     """
-    usuario_id = _resolve_current_local_user_id(current_user, db)
+    usuario_id = resolve_current_local_user_id(current_user, db)
     if not usuario_id:
         raise HTTPException(status_code=401, detail="Usuario no autenticado")
     
     orders = get_orders_by_usuario(db, usuario_id)
     
-    # Aplicar paginación (esto debería hacerse en el servicio)
     return orders[skip : skip + limit]
 
 

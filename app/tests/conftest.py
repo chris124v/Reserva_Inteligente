@@ -13,7 +13,7 @@ from app.database.connection import Base
 from app.database.session import get_db
 
 
-# ==================== BASE DE DATOS ====================
+# Bd
 
 @pytest.fixture(scope="session")
 def test_db_engine():
@@ -48,7 +48,7 @@ def test_db(test_db_engine):
     connection.close()
 
 
-# ==================== CLIENTE HTTP ====================
+# Cliente http
 
 @pytest.fixture
 def client(test_db):
@@ -103,7 +103,7 @@ def client(test_db):
     app.dependency_overrides.clear()
 
 
-# ==================== AUTENTICACIÓN ====================
+# Autenticacion
 
 @pytest.fixture
 def mock_settings():
@@ -159,7 +159,7 @@ def mock_verify_jwt():
         yield m
 
 
-# ==================== DATOS DE PRUEBA ====================
+# Datos de prueba
 
 @pytest.fixture
 def test_user_data():
@@ -237,7 +237,7 @@ def test_order_data():
     }
 
 
-# ==================== HELPERS ====================
+# Helpers
 
 @pytest.fixture
 def create_test_data(test_db):

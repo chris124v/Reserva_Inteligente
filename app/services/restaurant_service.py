@@ -3,7 +3,7 @@ from app.models.restaurant import Restaurant
 from app.schemas.restaurant import RestaurantCreate, RestaurantUpdate
 
 def get_restaurant(db: Session, restaurant_id: int):
-    """Busca un restaurante por su ID. Retorna None si no existe."""
+    """Busca un restaurante por su Id. Retorna None si no existe."""
     return db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
 
 def get_restaurant_by_email(db: Session, email: str):
@@ -28,8 +28,6 @@ def create_restaurant(db: Session, restaurant: RestaurantCreate, admin_id: int):
     """
     Registra un nuevo restaurante en el sistema.
     
-    El admin_id viene del token JWT del usuario autenticado,
-    no del body del request, por eso se pasa como parámetro separado.
     """
     # Verificamos que no exista ya un restaurante con ese email
     existing = get_restaurant_by_email(db, restaurant.email)

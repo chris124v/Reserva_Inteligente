@@ -1,8 +1,8 @@
 import email
 import hmac
 import hashlib
-import base64
-import boto3
+import base64 # Para generar el secret hash requerido por Cognito
+import boto3 #SDK de AWS para comunicarse con cognito
 import json
 
 import jwt
@@ -17,8 +17,9 @@ def get_secret_hash(username, client_id, client_secret):
 
 class CognitoClient:
     def __init__(self):
+
         # Inicializa el cliente de AWS Cognito
-        # Usa boto3 y las credenciales del .env
+        # Usa boto3 y las credenciales del .env verifica que esten todas
         missing = []
         if not settings.AWS_REGION:
             missing.append("AWS_REGION o AWS_COGNITO_REGION")
@@ -94,6 +95,7 @@ class CognitoClient:
     def authenticate_user(self, email: str, password: str):
         # Autentica y devuelve el JWT
 
+        #Generamos el secret hash
         secret_hash = get_secret_hash(
             email, 
             settings.COGNITO_CLIENT_ID,
@@ -174,7 +176,7 @@ class CognitoClient:
         """Busca el Username real de Cognito por atributo email.
 
         Funciona tanto si el pool usa el email como username, como si usa un
-        username interno (UUID) y email como atributo.
+        username interno y email como atributo.
         """
         response = self.client.list_users(
             UserPoolId=settings.COGNITO_USER_POOL_ID,
@@ -196,8 +198,7 @@ class CognitoClient:
     def update_user_email(self, current_email: str, new_email: str):
         """Actualiza el email del usuario en Cognito.
 
-        Nota: esto actualiza el atributo `email`. Dependiendo de la configuración
-        del User Pool, el `Username` puede no cambiar.
+        Esto actualiza el atributo `email`. 
         """
         username = self._find_username_by_email(current_email)
         self.client.admin_update_user_attributes(

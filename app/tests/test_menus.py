@@ -18,7 +18,7 @@ from app.services.menu_service import (
 )
 
 
-# ==================== TESTS DE SERVICIOS ====================
+# Servicios 
 
 class TestMenuService:
     """Tests para las funciones de servicio de menús."""
@@ -249,7 +249,7 @@ class TestMenuSchemas:
         assert response.nombre == "Pizza"
 
 
-# ==================== TESTS DE ENDPOINTS ====================
+# Endpoints
 
 class TestMenuEndpoints:
     """Tests para los endpoints de menús."""

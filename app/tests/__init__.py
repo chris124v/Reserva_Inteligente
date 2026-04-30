@@ -1,5 +1,5 @@
 """
-Módulo de tests para Reserva Inteligente de Restaurantes.
+Modulo de tests para Reserva Inteligente de Restaurantes.
 
 Este paquete contiene todos los tests automatizados para la API.
 Usa pytest como framework de testing.

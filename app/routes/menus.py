@@ -14,7 +14,11 @@ from app.auth.middleware import verify_jwt
 from typing import List
 from app.auth.cognito import CognitoClient
 from app.config import settings
-from app.services.user_service import get_user_by_email, get_user
+from app.services.user_service import (
+    get_user_by_email,
+    get_user,
+    resolve_current_local_user_id,
+)
 from app.models.user import RoleEnum
 from app.services.restaurant_service import get_restaurant
 
@@ -23,58 +27,8 @@ router = APIRouter(prefix="/menus", tags=["menus"])
 cognito_client = CognitoClient()
 
 
-def _extract_email_from_cognito_user(user_response: dict) -> str | None:
-    for attr in user_response.get("UserAttributes", []):
-        if attr.get("Name") == "email":
-            return attr.get("Value")
-    return None
-
-
-def _resolve_current_local_user_id(current_user: dict, db: Session) -> int | None:
-    raw_user_id = current_user.get("usuario_id")
-    if raw_user_id is not None:
-        try:
-            return int(raw_user_id)
-        except (TypeError, ValueError):
-            pass
-
-    raw_numeric_id = current_user.get("sub") or current_user.get("username")
-    if raw_numeric_id is not None:
-        try:
-            return int(raw_numeric_id)
-        except (TypeError, ValueError):
-            pass
-
-    email = current_user.get("email")
-    if email:
-        local_user = get_user_by_email(db, email)
-        if local_user:
-            return local_user.id
-
-    username = current_user.get("username") or current_user.get("sub")
-    if not username:
-        return None
-
-    if "@" in username:
-        local_user = get_user_by_email(db, username)
-        return local_user.id if local_user else None
-
-    try:
-        user_response = cognito_client.client.admin_get_user(
-            UserPoolId=settings.COGNITO_USER_POOL_ID,
-            Username=username,
-        )
-        email = _extract_email_from_cognito_user(user_response)
-        if not email:
-            return None
-        local_user = get_user_by_email(db, email)
-        return local_user.id if local_user else None
-    except Exception:
-        return None
-
-
 def _require_admin_local_user(payload: dict, db: Session):
-    user_id = _resolve_current_local_user_id(payload, db)
+    user_id = resolve_current_local_user_id(payload, db)
     if not user_id:
         raise HTTPException(status_code=401, detail="Usuario no autenticado")
 

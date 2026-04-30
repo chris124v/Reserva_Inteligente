@@ -1,10 +1,9 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, DateTime
-from app.database.connection import Base
+from sqlalchemy import Column, DateTime #Para clear columnas tipo datetime
+from app.database.connection import Base #Plantilla de conecction
 
-
+#Hora actual de UTC sin info de zona horaria
 def _utcnow_naive() -> datetime:
-    # Avoid datetime.utcnow deprecation while keeping naive UTC datetimes. significa que no tienen información de zona horaria, pero se asume que están en UTC.
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 class BaseModel(Base):
@@ -12,8 +11,9 @@ class BaseModel(Base):
     Clase base para todos los modelos.
     Proporciona campos comunes: id, fecha_creacion, fecha_actualizacion
     """
-    __abstract__ = True
+    __abstract__ = True #No crea una tabla en la BD pero es un molde
     
+    #Esto es mas que todo para logs
     fecha_creacion = Column(
         DateTime, 
         default=_utcnow_naive,

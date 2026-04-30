@@ -16,7 +16,7 @@ from app.services.order_service import (
 )
 
 
-# ==================== TESTS DE SERVICIOS ====================
+# Servicios
 
 class TestOrderService:
     """Tests para las funciones de servicio de pedidos."""
@@ -195,7 +195,7 @@ class TestOrderService:
         assert result is None
 
 
-# ==================== TESTS DE SCHEMAS ====================
+# Schemas
 
 class TestOrderSchemas:
     """Tests para validación de esquemas."""
@@ -282,7 +282,7 @@ class TestOrderSchemas:
         assert response.estado == EstadoPedidoEnum.PENDIENTE
 
 
-# ==================== TESTS DE ENDPOINTS ====================
+# Endpoints
 
 class TestOrderEndpoints:
     """Tests para los endpoints de pedidos."""
