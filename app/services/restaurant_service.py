@@ -1,85 +1,79 @@
-from sqlalchemy.orm import Session
+from app.models.user import RoleEnum
 from app.models.restaurant import Restaurant
 from app.schemas.restaurant import RestaurantCreate, RestaurantUpdate
 
-def get_restaurant(db: Session, restaurant_id: int):
-    """Busca un restaurante por su Id. Retorna None si no existe."""
-    return db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
 
-def get_restaurant_by_email(db: Session, email: str):
-    """
-    Busca un restaurante por su email.
-    Útil para evitar registrar el mismo restaurante dos veces.
-    """
-    return db.query(Restaurant).filter(Restaurant.email == email).first()
+def get_restaurant(dao, restaurant_id: int) -> Restaurant | None:
+    """Obtiene un restaurante por ID"""
+    return dao.get_by_id(restaurant_id)
 
-def get_all_restaurants(db: Session):
-    """Retorna la lista completa de restaurantes registrados."""
-    return db.query(Restaurant).all()
 
-def get_restaurants_by_admin(db: Session, admin_id: int):
-    """
-    Retorna todos los restaurantes administrados por un usuario específico.
-    Útil para que el admin vea solo sus propios restaurantes.
-    """
-    return db.query(Restaurant).filter(Restaurant.admin_id == admin_id).all()
+def get_restaurant_by_email(dao, email: str) -> Restaurant | None:
+    """Obtiene un restaurante por email"""
+    return dao.get_by_email(email)
 
-def create_restaurant(db: Session, restaurant: RestaurantCreate, admin_id: int):
-    """
-    Registra un nuevo restaurante en el sistema.
-    
-    """
-    # Verificamos que no exista ya un restaurante con ese email
-    existing = get_restaurant_by_email(db, restaurant.email)
+
+def get_all_restaurants(dao) -> list[Restaurant]:
+    """Obtiene todos los restaurantes"""
+    return dao.get_all()
+
+
+def create_restaurant(dao, user_dao, restaurant_data: RestaurantCreate, admin_id: int) -> Restaurant | None:
+    """Valida permisos y email único antes de crear."""
+    admin_user = user_dao.get_by_id(admin_id)
+    if not admin_user:
+        return None
+
+    existing = dao.get_by_email(restaurant_data.email)
     if existing:
-        return None  # El route se encarga de lanzar el 400
-
-    db_restaurant = Restaurant(
-        nombre=restaurant.nombre,
-        descripcion=restaurant.descripcion,
-        direccion=restaurant.direccion,
-        telefono=restaurant.telefono,
-        email=restaurant.email,
-        hora_apertura=restaurant.hora_apertura,
-        hora_cierre=restaurant.hora_cierre,
-        total_mesas=restaurant.total_mesas,
-        admin_id=admin_id  # Se asigna desde el token, no desde el request
-    )
-    db.add(db_restaurant)
-    db.commit()
-    db.refresh(db_restaurant)
-    return db_restaurant
-
-def update_restaurant(db: Session, restaurant_id: int, restaurant: RestaurantUpdate):
-    """
-    Actualiza los datos de un restaurante existente.
-    Solo modifica los campos que vienen en el request (exclude_unset).
-    Retorna None si el restaurante no existe.
-    """
-    db_restaurant = get_restaurant(db, restaurant_id)
-    if not db_restaurant:
         return None
 
-    # Solo actualizamos los campos que el usuario envió
-    update_data = restaurant.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(db_restaurant, field, value)
+    return dao.create({
+        "nombre": restaurant_data.nombre,
+        "descripcion": restaurant_data.descripcion,
+        "direccion": restaurant_data.direccion,
+        "telefono": restaurant_data.telefono,
+        "email": restaurant_data.email,
+        "hora_apertura": restaurant_data.hora_apertura,
+        "hora_cierre": restaurant_data.hora_cierre,
+        "total_mesas": restaurant_data.total_mesas,
+        "admin_id": admin_id
+    })
 
-    db.commit()
-    db.refresh(db_restaurant)
-    return db_restaurant
 
-def delete_restaurant(db: Session, restaurant_id: int):
+def validate_restaurant_admin(user_dao, admin_id: int, restaurant) -> None:
     """
-    Elimina un restaurante del sistema.
-    Por el CASCADE definido en el modelo, también elimina
-    sus menús, reservas y pedidos asociados.
-    Retorna None si el restaurante no existe.
+    Valida que el usuario autenticado sea admin y dueño del restaurante.
+    Lanza HTTPException si no tiene permiso.
     """
-    db_restaurant = get_restaurant(db, restaurant_id)
-    if not db_restaurant:
+    from fastapi import HTTPException
+
+    admin_user = user_dao.get_by_id(admin_id)
+    if not admin_user:
+        raise HTTPException(status_code=401, detail="Usuario no autenticado o no sincronizado en BD local")
+
+    if admin_user.rol != RoleEnum.ADMIN:
+        raise HTTPException(status_code=403, detail="Solo usuarios admin pueden modificar restaurantes")
+
+    if restaurant.admin_id != admin_id:
+        raise HTTPException(status_code=403, detail="No tiene permiso para modificar este restaurante")
+
+
+def update_restaurant(dao, restaurant_id: int, restaurant_data: RestaurantUpdate) -> Restaurant | None:
+    """Actualiza un restaurante"""
+    restaurant = dao.get_by_id(restaurant_id)
+    if not restaurant:
         return None
+    
+    update_data = restaurant_data.model_dump(exclude_unset=True)
+    return dao.update(restaurant_id, update_data)
 
-    db.delete(db_restaurant)
-    db.commit()
-    return db_restaurant
+
+def delete_restaurant(dao, restaurant_id: int) -> bool:
+    """Elimina un restaurante"""
+    restaurant = dao.get_by_id(restaurant_id)
+    if not restaurant:
+        return False
+    
+    dao.delete(restaurant_id)
+    return True

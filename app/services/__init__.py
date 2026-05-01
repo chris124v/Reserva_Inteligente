@@ -28,11 +28,3 @@ from app.services.restaurant_service import (
     update_restaurant,
     delete_restaurant
 )
-
-from app.services.user_service import (
-    get_user,
-    get_user_by_email,
-    create_user,
-    update_user,
-    delete_user
-)
