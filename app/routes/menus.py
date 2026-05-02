@@ -1,152 +1,109 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from app.database.session import get_db
-from app.schemas.menu import MenuCreate, MenuCreateRequest, MenuUpdate, MenuResponse
-from app.services.menu_service import (
-    get_menu,
-    get_all_menus,
-    get_menus_by_restaurante,
-    create_menu,
-    update_menu,
-    delete_menu
-)
 from app.auth.middleware import verify_jwt
-from typing import List
-from app.auth.cognito import CognitoClient
 from app.config import settings
-from app.services.user_service import (
-    get_user_by_email,
-    get_user,
-    resolve_current_local_user_id,
-)
-from app.models.user import RoleEnum
-from app.services.restaurant_service import get_restaurant
+from app.schemas.menu import MenuCreate, MenuCreateRequest, MenuUpdate, MenuResponse
+from app.dao.factory import DAOFactory
+from app.services.user_service import resolve_current_local_user_id
+from app.services.menu_service import validate_menu_admin
+from typing import List
 
 router = APIRouter(prefix="/menus", tags=["menus"])
 
-cognito_client = CognitoClient()
 
+def get_menu_dao(db: Session = Depends(get_db)):
+    return DAOFactory.get_menu_dao(settings.DATABASE_TYPE, db)
 
-def _require_admin_local_user(payload: dict, db: Session):
-    user_id = resolve_current_local_user_id(payload, db)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Usuario no autenticado")
+def get_user_dao(db: Session = Depends(get_db)):
+    return DAOFactory.get_user_dao(settings.DATABASE_TYPE, db)
 
-    local_user = get_user(db, user_id)
-    if not local_user:
-        raise HTTPException(status_code=401, detail="Usuario no autenticado o no sincronizado en BD local")
+def get_restaurant_dao(db: Session = Depends(get_db)):
+    return DAOFactory.get_restaurant_dao(settings.DATABASE_TYPE, db)
 
-    if local_user.rol != RoleEnum.ADMIN:
-        raise HTTPException(status_code=403, detail="Solo usuarios admin pueden modificar menús")
-
-    return local_user
 
 @router.get("/", response_model=List[MenuResponse])
 async def listar_menus(
     restaurante_id: int = None,
-    db: Session = Depends(get_db)
+    menu_dao=Depends(get_menu_dao)
 ):
-    """
-    Lista todos los menús. Si se pasa restaurante_id como query param,
-    filtra los menús de ese restaurante específico.
-    Ejemplo: GET /menus?restaurante_id=1
-    """
     if restaurante_id:
-        return get_menus_by_restaurante(db, restaurante_id)
-    return get_all_menus(db)
+        return menu_dao.get_by_restaurante(restaurante_id)
+    return menu_dao.get_all()
+
 
 @router.get("/{menu_id}", response_model=MenuResponse)
 async def obtener_menu(
     menu_id: int,
-    db: Session = Depends(get_db)
+    menu_dao=Depends(get_menu_dao)
 ):
-    """Obtiene el detalle de un menú específico por su ID."""
-    menu = get_menu(db, menu_id)
+    menu = menu_dao.get_by_id(menu_id)
     if not menu:
         raise HTTPException(status_code=404, detail="Menú no encontrado")
     return menu
+
 
 @router.post("/", response_model=MenuResponse, status_code=201)
 async def crear_menu(
     menu: MenuCreateRequest,
     restaurante_id: int = Query(..., gt=0),
-    db: Session = Depends(get_db),
-    payload: dict = Depends(verify_jwt)  # Requiere autenticación
+    payload: dict = Depends(verify_jwt),
+    menu_dao=Depends(get_menu_dao),
+    user_dao=Depends(get_user_dao),
+    restaurant_dao=Depends(get_restaurant_dao)
 ):
-    """
-    Crea un nuevo plato en el menú de un restaurante.
-    Requiere estar autenticado.
-    """
-    local_user = _require_admin_local_user(payload, db)
+    admin_id = resolve_current_local_user_id(payload, user_dao)
+    if not admin_id:
+        raise HTTPException(status_code=401, detail="Usuario no autenticado")
 
-    restaurante = get_restaurant(db, restaurante_id)
-    if not restaurante:
-        raise HTTPException(status_code=404, detail="Restaurante no encontrado")
+    validate_menu_admin(user_dao, restaurant_dao, admin_id, restaurante_id)
 
-    if restaurante.admin_id != local_user.id:
-        raise HTTPException(status_code=403, detail="No tiene permiso para crear menús en este restaurante")
-
-    nuevo_menu = create_menu(
-        db,
-        MenuCreate(**menu.model_dump(), restaurante_id=restaurante_id),
-    )
-    if not nuevo_menu:
-        raise HTTPException(status_code=400, detail="Error al crear el menú")
+    nuevo_menu = menu_dao.create({
+        **menu.model_dump(),
+        "restaurante_id": restaurante_id
+    })
     return nuevo_menu
+
 
 @router.put("/{menu_id}", response_model=MenuResponse)
 async def actualizar_menu(
     menu_id: int,
     menu: MenuUpdate,
-    db: Session = Depends(get_db),
-    payload: dict = Depends(verify_jwt)  # Requiere autenticación
+    payload: dict = Depends(verify_jwt),
+    menu_dao=Depends(get_menu_dao),
+    user_dao=Depends(get_user_dao),
+    restaurant_dao=Depends(get_restaurant_dao)
 ):
-    """
-    Actualiza los datos de un plato existente.
-    Solo se modifican los campos enviados en el request.
-    """
-    local_user = _require_admin_local_user(payload, db)
-
-    menu_existente = get_menu(db, menu_id)
+    menu_existente = menu_dao.get_by_id(menu_id)
     if not menu_existente:
         raise HTTPException(status_code=404, detail="Menú no encontrado")
 
-    restaurante = get_restaurant(db, menu_existente.restaurante_id)
-    if not restaurante:
-        raise HTTPException(status_code=404, detail="Restaurante no encontrado")
+    admin_id = resolve_current_local_user_id(payload, user_dao)
+    if not admin_id:
+        raise HTTPException(status_code=401, detail="Usuario no autenticado")
 
-    if restaurante.admin_id != local_user.id:
-        raise HTTPException(status_code=403, detail="No tiene permiso para actualizar este menú")
+    validate_menu_admin(user_dao, restaurant_dao, admin_id, menu_existente.restaurante_id)
 
-    menu_actualizado = update_menu(db, menu_id, menu)
-    if not menu_actualizado:
-        raise HTTPException(status_code=404, detail="Menú no encontrado")
-    return menu_actualizado
+    return menu_dao.update(menu_existente, menu.model_dump(exclude_unset=True))
+
 
 @router.delete("/{menu_id}", status_code=204)
 async def eliminar_menu(
     menu_id: int,
-    db: Session = Depends(get_db),
-    payload: dict = Depends(verify_jwt)  # Requiere autenticación
+    payload: dict = Depends(verify_jwt),
+    menu_dao=Depends(get_menu_dao),
+    user_dao=Depends(get_user_dao),
+    restaurant_dao=Depends(get_restaurant_dao)
 ):
-    """
-    Elimina un plato del menú.
-    Requiere estar autenticado.
-    """
-    local_user = _require_admin_local_user(payload, db)
-
-    menu_existente = get_menu(db, menu_id)
+    menu_existente = menu_dao.get_by_id(menu_id)
     if not menu_existente:
         raise HTTPException(status_code=404, detail="Menú no encontrado")
 
-    restaurante = get_restaurant(db, menu_existente.restaurante_id)
-    if not restaurante:
-        raise HTTPException(status_code=404, detail="Restaurante no encontrado")
+    admin_id = resolve_current_local_user_id(payload, user_dao)
+    if not admin_id:
+        raise HTTPException(status_code=401, detail="Usuario no autenticado")
 
-    if restaurante.admin_id != local_user.id:
-        raise HTTPException(status_code=403, detail="No tiene permiso para eliminar este menú")
+    validate_menu_admin(user_dao, restaurant_dao, admin_id, menu_existente.restaurante_id)
 
-    menu_eliminado = delete_menu(db, menu_id)
-    if not menu_eliminado:
-        raise HTTPException(status_code=404, detail="Menú no encontrado")
+    menu_dao.delete(menu_existente)
     return None

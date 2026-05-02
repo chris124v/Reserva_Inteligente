@@ -2,25 +2,38 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.auth.middleware import verify_jwt
-from app.auth.cognito import CognitoClient
 from app.config import settings
 from app.schemas.order import OrderCreate, OrderCreateRequest, OrderItem, OrderResponse
-from app.services.user_service import (
-    get_user,
-    get_user_by_email,
-    resolve_current_local_user_id,
-)
-from app.services.restaurant_service import get_restaurant
-from app.services.menu_service import get_menu
+from app.dao.factory import DAOFactory
 from app.models.user import RoleEnum
-from app.services.order_service import (
-    get_orders_by_usuario,
-    get_orders_by_restaurante,
-    create_order,
-)
+from app.services.user_service import resolve_current_local_user_id
+from app.services.order_service import create_order
 
 router = APIRouter(prefix="/orders", tags=["orders"])
-cognito_client = CognitoClient()
+
+
+def get_order_dao(db: Session = Depends(get_db)):
+    return DAOFactory.get_order_dao(settings.DATABASE_TYPE, db)
+
+def get_user_dao(db: Session = Depends(get_db)):
+    return DAOFactory.get_user_dao(settings.DATABASE_TYPE, db)
+
+def get_restaurant_dao(db: Session = Depends(get_db)):
+    return DAOFactory.get_restaurant_dao(settings.DATABASE_TYPE, db)
+
+def get_menu_dao(db: Session = Depends(get_db)):
+    return DAOFactory.get_menu_dao(settings.DATABASE_TYPE, db)
+
+
+def _resolve_user(current_user, user_dao):
+    from fastapi import HTTPException
+    usuario_id = resolve_current_local_user_id(current_user, user_dao)
+    if not usuario_id:
+        raise HTTPException(status_code=401, detail="Usuario no autenticado")
+    local_user = user_dao.get_by_id(usuario_id)
+    if not local_user:
+        raise HTTPException(status_code=401, detail="Usuario no autenticado o no sincronizado en BD local")
+    return local_user
 
 
 @router.post("/", response_model=OrderResponse, status_code=201)
@@ -28,131 +41,66 @@ async def crear_pedido(
     order_data: OrderCreateRequest,
     restaurante_id: int = Query(..., ge=1),
     menu_id: int = Query(..., ge=1),
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(verify_jwt)
+    current_user: dict = Depends(verify_jwt),
+    order_dao=Depends(get_order_dao),
+    user_dao=Depends(get_user_dao),
+    restaurant_dao=Depends(get_restaurant_dao),
+    menu_dao=Depends(get_menu_dao)
 ):
-    """
-    Crea un nuevo pedido para el usuario autenticado.
-    
-    Solo lo pueden crear los clientes.
-    """
-    try:
-        # Obtener usuario_id del JWT
-        usuario_id = resolve_current_local_user_id(current_user, db)
-        
-        if not usuario_id:
-            raise HTTPException(status_code=401, detail="Usuario no autenticado")
+    local_user = _resolve_user(current_user, user_dao)
 
-        local_user = get_user(db, usuario_id)
-        if not local_user:
-            raise HTTPException(status_code=401, detail="Usuario no autenticado o no sincronizado en BD local")
+    if local_user.rol != RoleEnum.CLIENTE:
+        raise HTTPException(status_code=403, detail="Solo clientes pueden crear pedidos")
 
-        if local_user.rol != RoleEnum.CLIENTE:
-            raise HTTPException(status_code=403, detail="Solo clientes pueden crear pedidos")
+    restaurante = restaurant_dao.get_by_id(restaurante_id)
+    if not restaurante:
+        raise HTTPException(status_code=404, detail="Restaurante no encontrado")
 
-        # Construir el pedido interno (manteniendo el schema existente)
-        order_to_create = OrderCreate(
-            restaurante_id=restaurante_id,
-            items=[OrderItem(menu_id=menu_id, cantidad=order_data.cantidad)],
-            tipo_entrega=order_data.tipo_entrega,
-            direccion_entrega=order_data.direccion_entrega,
-            notas=order_data.notas,
-        )
-        
-        # Validar dirección de entrega si es domicilio
-        if order_to_create.tipo_entrega.value == "domicilio" and not order_to_create.direccion_entrega:
-            raise HTTPException(
-                status_code=400,
-                detail="La dirección de entrega es requerida para tipo DOMICILIO"
-            )
+    order_to_create = OrderCreate(
+        restaurante_id=restaurante_id,
+        items=[OrderItem(menu_id=menu_id, cantidad=order_data.cantidad)],
+        tipo_entrega=order_data.tipo_entrega,
+        direccion_entrega=order_data.direccion_entrega,
+        notas=order_data.notas,
+    )
 
-        restaurante = get_restaurant(db, restaurante_id)
-        if not restaurante:
-            raise HTTPException(status_code=404, detail="Restaurante no encontrado")
+    return create_order(order_dao, None, restaurant_dao, menu_dao, order_to_create, local_user.id)
 
-        menu = get_menu(db, menu_id)
-        if not menu:
-            raise HTTPException(status_code=404, detail="Menu no encontrado")
 
-        if menu.restaurante_id != restaurante_id:
-            raise HTTPException(status_code=400, detail="El menu no pertenece a este restaurante")
+@router.get("/", response_model=list[OrderResponse])
+async def listar_mis_pedidos(
+    current_user: dict = Depends(verify_jwt),
+    limit: int = Query(10, ge=1, le=100),
+    skip: int = Query(0, ge=0),
+    order_dao=Depends(get_order_dao),
+    user_dao=Depends(get_user_dao)
+):
+    local_user = _resolve_user(current_user, user_dao)
+    orders = order_dao.get_by_usuario(local_user.id)
+    return orders[skip: skip + limit]
 
-        if not menu.disponible:
-            raise HTTPException(status_code=400, detail="El menu no está disponible")
-
-        subtotal = round(float(menu.precio) * int(order_data.cantidad), 2)
-        impuesto = 0.0
-        total = subtotal
-        
-        # Crear el pedido
-        db_order = create_order(
-            db=db,
-            order=order_to_create,
-            usuario_id=usuario_id,
-            subtotal=subtotal,
-            impuesto=impuesto,
-            total=total
-        )
-        
-        return db_order
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al crear el pedido: {str(e)}")
 
 @router.get("/restaurante/{restaurante_id}", response_model=list[OrderResponse])
 async def listar_pedidos_restaurante(
     restaurante_id: int,
-    db: Session = Depends(get_db),
     current_user: dict = Depends(verify_jwt),
     limit: int = Query(10, ge=1, le=100),
-    skip: int = Query(0, ge=0)
+    skip: int = Query(0, ge=0),
+    order_dao=Depends(get_order_dao),
+    user_dao=Depends(get_user_dao),
+    restaurant_dao=Depends(get_restaurant_dao)
 ):
-    """
-    Obtiene todos los pedidos de un restaurante.
-    Solo el dueño del restaurante puede ver esta información.
-    """
-    usuario_id = resolve_current_local_user_id(current_user, db)
-    if not usuario_id:
-        raise HTTPException(status_code=401, detail="Usuario no autenticado")
-
-    local_user = get_user(db, usuario_id)
-    if not local_user:
-        raise HTTPException(status_code=401, detail="Usuario no autenticado o no sincronizado en BD local")
+    local_user = _resolve_user(current_user, user_dao)
 
     if local_user.rol != RoleEnum.ADMIN:
         raise HTTPException(status_code=403, detail="Solo admins pueden ver pedidos por restaurante")
 
-    restaurante = get_restaurant(db, restaurante_id)
+    restaurante = restaurant_dao.get_by_id(restaurante_id)
     if not restaurante:
         raise HTTPException(status_code=404, detail="Restaurante no encontrado")
 
     if restaurante.admin_id != local_user.id:
         raise HTTPException(status_code=403, detail="No tiene permiso para ver los pedidos de este restaurante")
-    
-    orders = get_orders_by_restaurante(db, restaurante_id)
-    
-    # Aplicar paginación
-    return orders[skip : skip + limit]
 
-
-@router.get("/", response_model=list[OrderResponse])
-async def listar_mis_pedidos(
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(verify_jwt),
-    limit: int = Query(10, ge=1, le=100),
-    skip: int = Query(0, ge=0)
-):
-    """
-    Obtiene todos los pedidos del usuario autenticado.
-    """
-    usuario_id = resolve_current_local_user_id(current_user, db)
-    if not usuario_id:
-        raise HTTPException(status_code=401, detail="Usuario no autenticado")
-    
-    orders = get_orders_by_usuario(db, usuario_id)
-    
-    return orders[skip : skip + limit]
-
-
+    orders = order_dao.get_by_restaurante(restaurante_id)
+    return orders[skip: skip + limit]

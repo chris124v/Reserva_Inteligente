@@ -2,21 +2,8 @@ from app.models.user import User, RoleEnum
 from app.schemas.user import UserCreate
 from app.auth.cognito import CognitoClient
 from app.config import settings
-from sqlalchemy.orm import Session
 
 _cognito_client = CognitoClient()
-
-
-# Funciones de acceso a datos
-
-def get_user(db: Session, user_id: int) -> User | None:
-    """Obtiene un usuario por ID"""
-    return db.query(User).filter(User.id == user_id).first()
-
-
-def get_user_by_email(db: Session, email: str) -> User | None:
-    """Obtiene un usuario por email"""
-    return db.query(User).filter(User.email == email).first()
 
 
 # Logica de negocio

@@ -30,6 +30,7 @@ class Settings:
     # Codigo adicional para operaciones importantes.
     MASTER_ADMIN_CODE = os.getenv("MASTER_ADMIN_CODE")
 
-    DATABASE_TYPE: str = "postgresql"
+    #Base a usar
+    DATABASE_TYPE: str = os.getenv("DATABASE_TYPE", "postgresql")
 
 settings = Settings()

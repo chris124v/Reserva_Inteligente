@@ -1,52 +1,37 @@
-from sqlalchemy.orm import Session
-from app.models.order import Order, EstadoPedidoEnum
-from app.schemas.order import OrderCreate, OrderUpdate
+from app.schemas.order import OrderCreate
 
-def get_order(db: Session, order_id: int):
-    return db.query(Order).filter(Order.id == order_id).first()
 
-def get_orders_by_usuario(db: Session, usuario_id: int):
-    return db.query(Order).filter(Order.usuario_id == usuario_id).all()
+def create_order(order_dao, reservation_dao, restaurant_dao, menu_dao, order: OrderCreate, usuario_id: int):
+    """
+    Valida menú, calcula precios y crea el pedido.
+    """
+    from fastapi import HTTPException
 
-def get_orders_by_restaurante(db: Session, restaurante_id: int):
-    return db.query(Order).filter(Order.restaurante_id == restaurante_id).all()
+    menu = menu_dao.get_by_id(order.items[0].menu_id)
+    if not menu:
+        raise HTTPException(status_code=404, detail="Menu no encontrado")
 
-def create_order(db: Session, order: OrderCreate, usuario_id: int, subtotal: float, impuesto: float, total: float):
-    db_order = Order(
-        usuario_id=usuario_id,
-        restaurante_id=order.restaurante_id,
-        items=[item.model_dump() for item in order.items],
-        subtotal=subtotal,
-        impuesto=impuesto,
-        total=total,
-        tipo_entrega=order.tipo_entrega,
-        direccion_entrega=order.direccion_entrega,
-        notas=order.notas
-    )
-    db.add(db_order)
-    db.commit()
-    db.refresh(db_order)
-    return db_order
+    if menu.restaurante_id != order.restaurante_id:
+        raise HTTPException(status_code=400, detail="El menu no pertenece a este restaurante")
 
-def update_order_estado(db: Session, order_id: int, order: OrderUpdate):
-    db_order = get_order(db, order_id)
-    if not db_order:
-        return None
+    if not menu.disponible:
+        raise HTTPException(status_code=400, detail="El menu no está disponible")
 
-    update_data = order.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(db_order, field, value)
+    if order.tipo_entrega.value == "domicilio" and not order.direccion_entrega:
+        raise HTTPException(status_code=400, detail="La dirección de entrega es requerida para tipo DOMICILIO")
 
-    db.commit()
-    db.refresh(db_order)
-    return db_order
+    subtotal = round(float(menu.precio) * int(order.items[0].cantidad), 2)
+    impuesto = 0.0
+    total = subtotal
 
-def cancel_order(db: Session, order_id: int):
-    db_order = get_order(db, order_id)
-    if not db_order:
-        return None
-    
-    db_order.estado = EstadoPedidoEnum.CANCELADO
-    db.commit()
-    db.refresh(db_order)
-    return db_order
+    return order_dao.create({
+        "usuario_id": usuario_id,
+        "restaurante_id": order.restaurante_id,
+        "items": [item.model_dump() for item in order.items],
+        "subtotal": subtotal,
+        "impuesto": impuesto,
+        "total": total,
+        "tipo_entrega": order.tipo_entrega,
+        "direccion_entrega": order.direccion_entrega,
+        "notas": order.notas,
+    })
