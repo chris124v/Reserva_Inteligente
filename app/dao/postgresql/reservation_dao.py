@@ -11,12 +11,15 @@ class PostgreSQLReservationDAO(BaseDAO):
 
     # Lectura sencilla
 
+    #Retorna una reserva por su id, o None si no existe
     def get_by_id(self, reservation_id: int) -> Reservation | None:
         return self.session.query(Reservation).filter(Reservation.id == reservation_id).first()
 
+    #Retorna las reservas de un usuario, esto es para el endpoint de ver mis reservas
     def get_by_usuario(self, usuario_id: int) -> list[Reservation]:
         return self.session.query(Reservation).filter(Reservation.usuario_id == usuario_id).all()
 
+    #Retorna las reservas de un restaurante, esto es para el endpoint de ver reservas del restaurante y asi el admin puede ver que atender
     def get_by_restaurante(self, restaurante_id: int) -> list[Reservation]:
         return self.session.query(Reservation).filter(Reservation.restaurante_id == restaurante_id).all()
 
@@ -37,11 +40,12 @@ class PostgreSQLReservationDAO(BaseDAO):
             Reservation.fecha == fecha,
             Reservation.estado == EstadoReservaEnum.RESERVADA,
             Reservation.numero_mesa.isnot(None),
-        ).all()
+        ).all() #Devuelve lista en tuplas pero las convertimos
         return {n for (n,) in rows}
 
     # Queries de escritura
 
+    # Crea una nueva reserva y hace el commit en la bd
     def create(self, data: dict) -> Reservation:
         reservation = Reservation(
             usuario_id=data["usuario_id"],
@@ -65,7 +69,7 @@ class PostgreSQLReservationDAO(BaseDAO):
         self.session.refresh(reservation)
         return reservation
 
-    # Delete real   
+    # Delete real en postgres
     def delete(self, reservation: Reservation) -> Reservation:
         self.session.delete(reservation)
         self.session.commit()

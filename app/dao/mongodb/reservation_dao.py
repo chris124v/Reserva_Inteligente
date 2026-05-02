@@ -12,18 +12,22 @@ class MongoDBReservationDAO(BaseDAO):
 
     # Metodos de lectura
 
+    #Obtiene una reserva por su id
     def get_by_id(self, reservation_id: int):
         doc = self.collection.find_one({"id": reservation_id})
         return self._to_model(doc)
 
+    #Obtiene las reservas de un usuario
     def get_by_usuario(self, usuario_id: int) -> list:
         docs = self.collection.find({"usuario_id": usuario_id})
         return [self._to_model(doc) for doc in docs]
 
+    #Obtiene las reservas por restaurate, esto es mas que todo para admins
     def get_by_restaurante(self, restaurante_id: int) -> list:
         docs = self.collection.find({"restaurante_id": restaurante_id})
         return [self._to_model(doc) for doc in docs]
 
+    #Metodo para contar las reservas activas de un restaurante en una fecha para disponibilidad
     def count_reservas_activas(self, restaurante_id: int, fecha: date) -> int:
         return self.collection.count_documents({
             "restaurante_id": restaurante_id,
@@ -31,6 +35,7 @@ class MongoDBReservationDAO(BaseDAO):
             "estado": EstadoReservaEnum.RESERVADA.value
         })
 
+    #Metodo para obtener las mesas ocupadas de un restaurante
     def get_mesas_ocupadas(self, restaurante_id: int, fecha: date) -> set[int]:
         docs = self.collection.find(
             {
@@ -45,6 +50,7 @@ class MongoDBReservationDAO(BaseDAO):
 
     # Metodos de escritura
 
+    #Metodo para crear una nueva reserva nuevamente hacemos lo mismo de subir +1 el id mas grande
     def create(self, data: dict):
         last = self.collection.find_one(sort=[("id", -1)])
         new_id = (last["id"] + 1) if last else 1
@@ -63,6 +69,7 @@ class MongoDBReservationDAO(BaseDAO):
         self.collection.insert_one(doc)
         return self._to_model(doc)
 
+    #Updateamos lo que nos pasa data, los recorremos para converirlos en valores que mongo pueda leer y despues actualizamos
     def update(self, reservation, data: dict):
         serialized = {}
         for k, v in data.items():
@@ -76,6 +83,7 @@ class MongoDBReservationDAO(BaseDAO):
         self.collection.update_one({"id": reservation.id}, {"$set": serialized})
         return self.get_by_id(reservation.id)
 
+    #Esto seria para cancelar una reserva
     def cancel(self, reservation):
         self.collection.update_one(
             {"id": reservation.id},
@@ -83,16 +91,18 @@ class MongoDBReservationDAO(BaseDAO):
         )
         return self.get_by_id(reservation.id)
 
+    #Delete real de una reserva
     def delete(self, reservation):
         self.collection.delete_one({"id": reservation.id})
         return reservation
 
-    # Metodos auxiliares
+    # Metodos de conversion
 
     def _to_model(self, doc: dict | None):
         if doc is None:
             return None
 
+        #Parasemos fecha y tiempo
         def parse_date(val):
             if isinstance(val, date):
                 return val
@@ -104,6 +114,7 @@ class MongoDBReservationDAO(BaseDAO):
             h, m, s = (val.split(":") + ["0"])[:3]
             return time(int(h), int(m), int(s))
 
+        #Devolvemos el objeto
         return SimpleNamespace(
             id=doc["id"],
             usuario_id=doc["usuario_id"],

@@ -10,17 +10,21 @@ class PostgreSQLMenuDAO(BaseDAO):
 
     # Lectura
 
+    #Obtiene un menu por si id
     def get_by_id(self, menu_id: int) -> Menu | None:
         return self.session.query(Menu).filter(Menu.id == menu_id).first()
 
+    #Obtiene los menus de un restaurante al que pertence
     def get_by_restaurante(self, restaurante_id: int) -> list[Menu]:
         return self.session.query(Menu).filter(Menu.restaurante_id == restaurante_id).all()
 
+    #Devuelve todos los menus disponibles en la bd de postgres
     def get_all(self) -> list[Menu]:
         return self.session.query(Menu).all()
 
     # Escritura
 
+    # Crea un nuevo menu y hace el commit en la bd
     def create(self, data: dict) -> Menu:
         menu = Menu(
             nombre=data["nombre"],
@@ -36,7 +40,7 @@ class PostgreSQLMenuDAO(BaseDAO):
         self.session.refresh(menu)
         return menu
 
-    # Updatea un menu
+    # Updatea un menu con lo que venga en data, esto lo definimos en schemas
     def update(self, menu: Menu, data: dict) -> Menu:
         for field, value in data.items():
             setattr(menu, field, value)
@@ -44,9 +48,8 @@ class PostgreSQLMenuDAO(BaseDAO):
         self.session.refresh(menu)
         return menu
 
-    #Este si es delete fisico porque no genera problemas 
+    #Delete fisico del menu en la bd
     def delete(self, menu: Menu) -> Menu:
-        """Delete físico, los menús sí se eliminan permanentemente."""
         self.session.delete(menu)
         self.session.commit()
         return menu

@@ -6,19 +6,22 @@ from fastapi import HTTPException
 
 # Logica de negocio
 
+# Valida permisos y email único antes de crear y delega al dao.
 def create_restaurant(dao, user_dao, restaurant_data: RestaurantCreate, admin_id: int) -> Restaurant | None:
-    """Valida permisos y email único antes de crear y delega al DAO."""
-    admin_user = user_dao.get_by_id(admin_id)
+    admin_user = user_dao.get_by_id(admin_id) #Solo los admins pueden hacer restaurantes
     if not admin_user:
         return None
 
+    #Si el usuario no es admin, no tiene permisos para crear restaurantes
     if admin_user.rol != RoleEnum.ADMIN:
         return None
 
+    #Verificamos que no exista un restaurante con el mismo email, si existe retornamos None
     existing = dao.get_by_email(restaurant_data.email)
     if existing:
         return None
 
+    #Creamos el restaurante con los datos necesarios y retornamos el restaurante creado todo delegado al dao
     return dao.create({
         "nombre": restaurant_data.nombre,
         "descripcion": restaurant_data.descripcion,
@@ -31,11 +34,12 @@ def create_restaurant(dao, user_dao, restaurant_data: RestaurantCreate, admin_id
         "admin_id": admin_id,
     })
 
-
+#Valida que admin_id corresponde a un admin y dueño del restaurante.
 def validate_restaurant_admin(user_dao, admin_id: int, restaurant) -> None:
-    """Valida que `admin_id` corresponde a un admin y dueño del restaurante.
-    Lanza HTTPException en caso de error."""
+    
     admin_user = user_dao.get_by_id(admin_id)
+    
+    #Lanzamos excepciones para cada caso si no es el dueno del restaurante o si ni squeria es admin
     if not admin_user:
         raise HTTPException(status_code=401, detail="Usuario no autenticado o no sincronizado en BD local")
 

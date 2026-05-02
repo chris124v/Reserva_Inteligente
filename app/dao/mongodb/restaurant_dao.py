@@ -10,24 +10,29 @@ class MongoDBRestaurantDAO(BaseDAO):
 
     # Metodos de pura lectura
 
+    #Retorna None si no encuentra, o el restaurante si lo encuentra
     def get_by_id(self, restaurant_id: int):
         doc = self.collection.find_one({"id": restaurant_id})
         return self._to_model(doc)
 
+    # Retorna un restaurante por su email, o None si no encuentra
     def get_by_email(self, email: str):
         doc = self.collection.find_one({"email": email})
         return self._to_model(doc)
 
+    #Obtiene todos los restaurantes, o una lista vacia si no hay ninguno
     def get_all(self) -> list:
         docs = self.collection.find()
         return [self._to_model(doc) for doc in docs]
 
+    #Obtiene todos los restaurantes de un admin, o una lista vacia si no hay ninguno
     def get_by_admin(self, admin_id: int) -> list:
         docs = self.collection.find({"admin_id": admin_id})
         return [self._to_model(doc) for doc in docs]
 
     # Metodos de escritura
 
+    #Metodo para crear un restaurante, hacemos lo mismo que en users de aumentar 1 por el id mas grande
     def create(self, data: dict):
         last = self.collection.find_one(sort=[("id", -1)])
         new_id = (last["id"] + 1) if last else 1
@@ -44,9 +49,10 @@ class MongoDBRestaurantDAO(BaseDAO):
             "total_mesas": data["total_mesas"],
             "admin_id": data["admin_id"]
         }
-        self.collection.insert_one(doc)
+        self.collection.insert_one(doc) #insertamos en la bd de mongo
         return self._to_model(doc)
 
+    #Nuevamente updateamos solo el data que venga en el schema
     def update(self, restaurant, data: dict):
         serialized = {}
         for k, v in data.items():
@@ -55,6 +61,7 @@ class MongoDBRestaurantDAO(BaseDAO):
         self.collection.update_one({"id": restaurant.id}, {"$set": serialized})
         return self.get_by_id(restaurant.id)
 
+    #Deleteamos por id, retornamos el restaurante eliminado o None si no se encontro
     def delete(self, restaurant):
         self.collection.delete_one({"id": restaurant.id})
         return restaurant
@@ -68,6 +75,7 @@ class MongoDBRestaurantDAO(BaseDAO):
         from app.models.restaurant import Restaurant
         from datetime import time
 
+        #Metodo para parserar las horas
         def parse_time(val):
             if isinstance(val, time):
                 return val
@@ -76,6 +84,7 @@ class MongoDBRestaurantDAO(BaseDAO):
                 return time(int(h), int(m), int(s))
             return val
 
+        #Retorna el objeto
         return SimpleNamespace(
             id=doc["id"],
             nombre=doc["nombre"],

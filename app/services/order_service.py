@@ -1,19 +1,20 @@
 from app.schemas.order import OrderCreate
 
-
+# Lógica de negocio y validaciones de pedidos
 def create_order(order_dao, reservation_dao, restaurant_dao, menu_dao, order: OrderCreate, usuario_id: int):
-    """
-    Valida menú, calcula precios y crea el pedido.
-    """
+    
     from fastapi import HTTPException
 
+    # Si no se encuentra el menu de donde sale el pedido no lo da
     menu = menu_dao.get_by_id(order.items[0].menu_id)
     if not menu:
         raise HTTPException(status_code=404, detail="Menu no encontrado")
 
+    #Si tampoco se especifica el restaurante no se puede crear el pedido
     if menu.restaurante_id != order.restaurante_id:
         raise HTTPException(status_code=400, detail="El menu no pertenece a este restaurante")
 
+    # Si el menu no esta disponible no se puede crear el pedido osea no existe
     if not menu.disponible:
         raise HTTPException(status_code=400, detail="El menu no está disponible")
 
@@ -24,6 +25,7 @@ def create_order(order_dao, reservation_dao, restaurant_dao, menu_dao, order: Or
     impuesto = 0.0
     total = subtotal
 
+    #Crea el pedido y se delega al dao
     return order_dao.create({
         "usuario_id": usuario_id,
         "restaurante_id": order.restaurante_id,

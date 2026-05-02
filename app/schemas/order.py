@@ -8,7 +8,7 @@ class OrderItem(BaseModel):
     cantidad: int = Field(..., gt=0)
 
 
-# Request simplificado para crear pedido (IDs van por query params)
+# Request simplificado para crear pedido (idss van por query params)
 class OrderCreateRequest(BaseModel):
     cantidad: int = Field(1, gt=0)
     tipo_entrega: TipoEntregaEnum = TipoEntregaEnum.RECOGIDA

@@ -1,12 +1,9 @@
 from app.models.user import RoleEnum
 from app.schemas.menu import MenuCreate
 
-
+# Valida que el usuario sea admin y dueño del restaurante, si es valido retorn el restaurante
 def validate_menu_admin(user_dao, restaurant_dao, admin_id: int, restaurante_id: int):
-    """
-    Valida que el usuario sea admin y dueño del restaurante.
-    Retorna el restaurante si es válido.
-    """
+
     from fastapi import HTTPException
 
     admin_user = user_dao.get_by_id(admin_id)

@@ -19,7 +19,7 @@ DATABASE_URL = os.getenv(
 engine = create_engine(
     DATABASE_URL,
     poolclass=QueuePool,
-    pool_size=5,              # Maximo 5 conexiones simultáneas
+    pool_size=5,              # Maximo 5 conexiones simultaneas
     max_overflow=10,          # Máximo 10 conexiones extras
     pool_pre_ping=True,       # Verifica que la conexión esté viva antes de usar
     echo=False                # True para ver logs SQL (desarrollo)
