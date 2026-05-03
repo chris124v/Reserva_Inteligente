@@ -28,8 +28,8 @@ htmlcov/
 # Docker
 docker-compose.override.yml
 
-# Kubernetes configs
-kubernetes/config/
+# Kubernetes secrets
+kubernetes/config/secret.yaml
 
 # Python
 dist/
