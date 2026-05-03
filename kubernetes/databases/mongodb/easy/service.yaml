@@ -1,0 +1,14 @@
+#En el archivo de postgres ya explique como funciona todo esto
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-service
+  namespace: reservainteligente
+spec:
+  selector:
+    app: mongo
+  ports:
+    - port: 27017
+      targetPort: 27017
+  type: ClusterIP

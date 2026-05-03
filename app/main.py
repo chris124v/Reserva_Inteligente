@@ -1,12 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes.auth import router as auth_router
-from app.routes.users import router as users_router
-from app.routes.restaurants import router as restaurants_router
-from app.routes.menus import router as menus_router
-from app.routes.reservations import router as reservations_router
-from app.routes.orders import router as orders_router
-from app.config import settings
+from .routes.auth import router as auth_router
+from .routes.users import router as users_router
+from .routes.restaurants import router as restaurants_router
+from .routes.menus import router as menus_router
+from .routes.reservations import router as reservations_router
+from .routes.orders import router as orders_router
+from .config import settings
 
 app = FastAPI(
     title="Reserva Inteligente de Restaurantes",

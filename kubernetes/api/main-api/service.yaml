@@ -1,0 +1,14 @@
+#Ya el service lo explique en el de postgres
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-service
+  namespace: reservainteligente
+spec:
+  selector:
+    app: main-api
+  ports:
+    - port: 80
+      targetPort: 8000
+  type: ClusterIP

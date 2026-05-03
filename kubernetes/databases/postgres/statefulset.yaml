@@ -1,0 +1,83 @@
+# Archivo para definir como crear y correr PostgreSQL en Kubernetes usando un StatefulSet
+
+# StatefulSet = Recurso de Kubernetes para aplicaciones con estado, garantiza identidad estable (nombres fijos de pods) y almacenamiento persistente por cada instancia
+
+# apiVersion = Versión de la API de Kubernetes que es apps/v1
+# kind = Tipo de recurso que se va a crear, en este caso un StatefulSet (para aplicaciones con estado como bases de datos)
+# metadata = Información descriptiva del recurso, como nombre y namespace
+
+# spec = Especificaciones del StatefulSet
+# serviceName = Nombre del servicio asociado para dar DNS estable a los pods
+# replicas = Numero de copias del contenedor que se quieren correr, en este caso 1
+# selector = Como identificar los pods que pertenecen a este StatefulSet usando labels (app: postgres)
+
+# template = Plantilla para los pods que se van a crear
+# metadata = Información descriptiva del pod, se le asigna la etiqueta app: postgres
+
+# spec = Especificaciones del pod
+# containers = Lista de contenedores, en este caso uno llamado postgres
+# image = Imagen de Docker a usar, en este caso postgres:16
+
+# ports = Puerto expuesto por el contenedor (5432)
+# env = Variables de entorno para configurar PostgreSQL usando ConfigMap y Secret
+# configMapKeyRef = Referencia a variables no sensibles (usuario, nombre de BD)
+# secretKeyRef = Referencia a variables sensibles (password)
+
+# volumeMounts = Montaje del volumen persistente en /var/lib/postgresql/data
+
+# volumeClaimTemplates = Define el PVC automaticamente para cada pod
+# accessModes = Tipo de acceso al volumen (ReadWriteOnce)
+# resources.requests.storage = Cantidad de almacenamiento solicitado
+
+# NOTA = StatefulSet garantiza nombres estables de pods y almacenamiento persistente por cada instancia
+
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: reservainteligente
+spec:
+  serviceName: postgres-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DATABASE_USER
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DATABASE_NAME
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DATABASE_PASSWORD
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-storage
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi

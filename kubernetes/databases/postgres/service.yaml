@@ -1,0 +1,21 @@
+# Service es el archivo de servicio para PostgreSQL en Kubernetes, como exponer la bd par conectarnos.
+
+#Type = ClusterIP: Expone el servicio solo dentro del cluster de Kubernetes. Permite que otros servicios como api se conecten a PostgreSQL usando el DNS interno (postgres-service).
+# Port = 5432 = Puerto interno dentro del servicio de kubernetes
+# targetPort = 5432 = Puerto del contenedor de postgresql
+# nodePort = 30432 = Puerto externo en mi maquina local para conectarme a postgresql
+
+# Selector: Le dice a service que envie el trafico a los pods con la etiqueta app: postgresql, que es la que definimos en el deployment
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: reservainteligente
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+  type: ClusterIP
