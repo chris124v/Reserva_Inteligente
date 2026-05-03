@@ -9,9 +9,10 @@ from app.models.user import RoleEnum
 from app.services.user_service import resolve_current_local_user_id
 from app.services.order_service import create_order
 
+#Ruta de los pedidos
 router = APIRouter(prefix="/orders", tags=["orders"])
 
-
+#Daos para todas dependencias
 def get_order_dao(db: Session = Depends(get_db)):
     return DAOFactory.get_order_dao(settings.DATABASE_TYPE, db)
 
@@ -24,7 +25,7 @@ def get_restaurant_dao(db: Session = Depends(get_db)):
 def get_menu_dao(db: Session = Depends(get_db)):
     return DAOFactory.get_menu_dao(settings.DATABASE_TYPE, db)
 
-
+#Metodo para resolver usuario local 
 def _resolve_user(current_user, user_dao):
     from fastapi import HTTPException
     usuario_id = resolve_current_local_user_id(current_user, user_dao)
@@ -35,7 +36,7 @@ def _resolve_user(current_user, user_dao):
         raise HTTPException(status_code=401, detail="Usuario no autenticado o no sincronizado en BD local")
     return local_user
 
-
+#Ruta para crear un nuevo pedido, si o si tiene que ser cliente entonces se valida como tal
 @router.post("/", response_model=OrderResponse, status_code=201)
 async def crear_pedido(
     order_data: OrderCreateRequest,
@@ -52,10 +53,12 @@ async def crear_pedido(
     if local_user.rol != RoleEnum.CLIENTE:
         raise HTTPException(status_code=403, detail="Solo clientes pueden crear pedidos")
 
+    #Se valida tambien que sea de un restaurante real
     restaurante = restaurant_dao.get_by_id(restaurante_id)
     if not restaurante:
         raise HTTPException(status_code=404, detail="Restaurante no encontrado")
 
+    #Creamos el pedido
     order_to_create = OrderCreate(
         restaurante_id=restaurante_id,
         items=[OrderItem(menu_id=menu_id, cantidad=order_data.cantidad)],
@@ -66,7 +69,7 @@ async def crear_pedido(
 
     return create_order(order_dao, None, restaurant_dao, menu_dao, order_to_create, local_user.id)
 
-
+#Ruta para listar todos los pedidos que tenga el usuario cliente
 @router.get("/", response_model=list[OrderResponse])
 async def listar_mis_pedidos(
     current_user: dict = Depends(verify_jwt),
@@ -79,7 +82,7 @@ async def listar_mis_pedidos(
     orders = order_dao.get_by_usuario(local_user.id)
     return orders[skip: skip + limit]
 
-
+#Ruta para listar los pedidos de un restaurante, en especifico, si o si deben ser admins
 @router.get("/restaurante/{restaurante_id}", response_model=list[OrderResponse])
 async def listar_pedidos_restaurante(
     restaurante_id: int,

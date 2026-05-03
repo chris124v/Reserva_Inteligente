@@ -8,46 +8,52 @@ from app.dao.factory import DAOFactory
 from app.services.user_service import resolve_current_local_user_id
 from app.services.restaurant_service import create_restaurant, validate_restaurant_admin
 
+# Ruta para gestionar restaurantes 
 router = APIRouter(prefix="/restaurants", tags=["restaurants"])
 
-
+#Dao para restaurantes
 def get_restaurant_dao(db: Session = Depends(get_db)):
     return DAOFactory.get_restaurant_dao(settings.DATABASE_TYPE, db)
 
+#Dao para usuarios, necesario para validar permisos de admin sobre el restaurante
 def get_user_dao(db: Session = Depends(get_db)):
     return DAOFactory.get_user_dao(settings.DATABASE_TYPE, db)
 
-
+#Ruta para crear el restaurante
 @router.post("/", response_model=RestaurantResponse, status_code=201)
 async def crear_restaurante(
     restaurant_data: RestaurantCreate,
     current_user: dict = Depends(verify_jwt),
     restaurant_dao=Depends(get_restaurant_dao),
     user_dao=Depends(get_user_dao)
-):
+):  
+    #Encontrar al usuario autenticado
     admin_id = resolve_current_local_user_id(current_user, user_dao)
     if not admin_id:
         raise HTTPException(status_code=401, detail="Usuario no autenticado")
 
-    # Validar rol antes de crear
+    # Busca el usuario local y sino esta tira la excepcion
     admin_user = user_dao.get_by_id(admin_id)
     if not admin_user:
         raise HTTPException(status_code=401, detail="Usuario no sincronizado en BD local")
 
+    #Valida que si o si tiene que ser admin
     from app.models.user import RoleEnum
     if admin_user.rol != RoleEnum.ADMIN:
         raise HTTPException(status_code=403, detail="Solo usuarios admin pueden crear restaurantes")
 
+    #Si ya hay un email con registrado con un restaurante no se puede usar
     if restaurant_dao.get_by_email(restaurant_data.email):
         raise HTTPException(status_code=400, detail="Ya existe un restaurante registrado con ese email")
 
+    #Creamos el restaurante
     db_restaurant = create_restaurant(restaurant_dao, user_dao, restaurant_data, admin_id)
     if not db_restaurant:
         raise HTTPException(status_code=400, detail="Error al crear el restaurante")
 
     return db_restaurant
 
-
+# Ruta para listar restaurantes
 @router.get("/", response_model=list[RestaurantResponse])
 async def listar_restaurantes(
     limit: int = Query(10, ge=1, le=100),
@@ -57,7 +63,7 @@ async def listar_restaurantes(
     restaurants = restaurant_dao.get_all()
     return restaurants[skip: skip + limit]
 
-
+# Ruta para actualuzar un restaurante, nuevamente solo el admin que creo el restaurante puede
 @router.put("/{restaurant_id}", response_model=RestaurantResponse)
 async def actualizar_restaurante(
     restaurant_id: int,
@@ -66,24 +72,29 @@ async def actualizar_restaurante(
     restaurant_dao=Depends(get_restaurant_dao),
     user_dao=Depends(get_user_dao)
 ):
+    #En caso de no encontrar el restaurante
     db_restaurant = restaurant_dao.get_by_id(restaurant_id)
     if not db_restaurant:
         raise HTTPException(status_code=404, detail="Restaurante no encontrado")
 
+    #Si el usuario no esta autenticado
     admin_id = resolve_current_local_user_id(current_user, user_dao)
     if not admin_id:
         raise HTTPException(status_code=401, detail="Usuario no autenticado")
 
+    #Verificar que es el dueno del restaurante 
     validate_restaurant_admin(user_dao, admin_id, db_restaurant)
 
+    #Si se cambia el email y es igual que otro lanza la excepcion
     if restaurant_update.email and restaurant_update.email != db_restaurant.email:
         if restaurant_dao.get_by_email(restaurant_update.email):
             raise HTTPException(status_code=400, detail="Ya existe un restaurante con ese email")
 
+    #Actualiza el restaurante
     update_data = restaurant_update.model_dump(exclude_unset=True)
     return restaurant_dao.update(db_restaurant, update_data)
 
-
+#Metodo para borra el restaurante validamos que el usuario este autenticado y sea el dueno. 
 @router.delete("/{restaurant_id}", status_code=204)
 async def eliminar_restaurante(
     restaurant_id: int,

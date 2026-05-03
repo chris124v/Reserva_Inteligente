@@ -72,8 +72,8 @@ class CognitoClient:
                 ]
             )
 
-            # Intento best-effort: persistir rol en Cognito como atributo custom.
-            # Nota: requiere que el User Pool tenga creado el atributo `custom:rol`.
+            #  persistir rol en Cognito como atributo custom.
+            
             if rol:
                 try:
                     self.client.admin_update_user_attributes(
@@ -151,7 +151,7 @@ class CognitoClient:
                 options={"verify_aud": False}
             )
 
-            # Validación explícita para access token de este app client
+            # Validacion explícita para access token de este app client
             token_use = payload.get("token_use")
             if token_use != "access":
                 return {"success": False, "error": "Token no es access token"}
@@ -172,18 +172,16 @@ class CognitoClient:
             return {"success": False, "error": str(e)}
 
 
+    #Busca el ussername real de cognito por atributo de email
     def _find_username_by_email(self, email_value: str) -> str:
-        """Busca el Username real de Cognito por atributo email.
-
-        Funciona tanto si el pool usa el email como username, como si usa un
-        username interno y email como atributo.
-        """
+        
         response = self.client.list_users(
             UserPoolId=settings.COGNITO_USER_POOL_ID,
             Filter=f'email = "{email_value}"',
             Limit=2,
         )
 
+        #Excepciones en caso de que no se encuentre nada
         users = response.get("Users", [])
         if not users:
             raise ValueError("Usuario no encontrado en Cognito")
@@ -195,11 +193,9 @@ class CognitoClient:
             raise ValueError("Respuesta inválida de Cognito (Username faltante)")
         return username
 
+    #Actualiza el email de un usuario dado su emial actual
     def update_user_email(self, current_email: str, new_email: str):
-        """Actualiza el email del usuario en Cognito.
-
-        Esto actualiza el atributo `email`. 
-        """
+    
         username = self._find_username_by_email(current_email)
         self.client.admin_update_user_attributes(
             UserPoolId=settings.COGNITO_USER_POOL_ID,
@@ -210,8 +206,9 @@ class CognitoClient:
             ],
         )
 
+    #Obtiene el sub (UUID) de Cognito para un usuario por su email, necesario para sincronizar con BD local
     def get_user_sub_by_email(self, email_value: str) -> str:
-        """Obtiene el `sub` (UUID) de Cognito para un usuario por su email."""
+        
         response = self.client.list_users(
             UserPoolId=settings.COGNITO_USER_POOL_ID,
             Filter=f'email = "{email_value}"',

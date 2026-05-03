@@ -14,13 +14,14 @@ from app.services.user_service import (
     resolve_current_local_user,
 )
 
+#Definimos la ruta de usuarios
 router = APIRouter(prefix="/users", tags=["users"])
 
-
+#Obtiene el dao que mapeamos para usuario dependiendo del DAO
 def get_user_dao(db: Session = Depends(get_db)):
     return DAOFactory.get_user_dao(settings.DATABASE_TYPE, db)
 
-
+#Devuelve una lista de todos los usuarios, con paginacion basica
 @router.get("/", response_model=list[UserResponse])
 async def listar_usuarios(
     current_user: dict = Depends(verify_jwt),
@@ -31,18 +32,19 @@ async def listar_usuarios(
     users = dao.get_all()
     return users[skip: skip + limit]
 
-
+#Devuelve el perfil de la persona autenticada por el login gracias al access token
 @router.get("/me", response_model=UserResponse)
 async def obtener_mi_perfil(
     current_user: dict = Depends(verify_jwt),
     dao=Depends(get_user_dao)
 ):
+    #Obtiene los datos del jwt
     db_user = resolve_current_local_user(current_user, dao)
     if not db_user:
         raise HTTPException(status_code=401, detail="Usuario no autenticado o no sincronizado en BD local")
     return db_user
 
-
+#Actualiza un usuario, solo el mismo usuario o un admin pueden actualizar, y para cambiar el estado activo se necesita el master admin code
 @router.put("/{user_id}", response_model=UserResponse)
 async def actualizar_usuario(
     user_id: int,
@@ -51,40 +53,48 @@ async def actualizar_usuario(
     master_admin_code: str | None = Header(None, alias="X-Master-Admin-Code"),
     dao=Depends(get_user_dao)
 ):
-    target_user = dao.get_by_id(user_id)
+    target_user = dao.get_by_id(user_id) #Busca el usuario a actualizar
     if not target_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
+    #Busca el usuario autenticado en la bd local
     current_local_user = resolve_current_local_user(current_user, dao)
+
+    #Valida si puede actualizarlo
     validate_update_permissions(current_local_user, target_user, master_admin_code)
 
+    #Si alguien intentea desactivar o eliminar un usuario debe ser admin y tener el codigo master
     if user_update.activo is not None and user_update.activo != target_user.activo:
         if current_local_user is None or current_local_user.rol != RoleEnum.ADMIN:
             raise HTTPException(status_code=403, detail="No tiene permiso para modificar el estado del usuario")
         if not master_admin_code or master_admin_code != settings.MASTER_ADMIN_CODE:
             raise HTTPException(status_code=403, detail="Código master admin inválido")
 
+    #Si cambia el email verificamos que no este usado, luego lo sincronizamos
     if user_update.email and user_update.email != target_user.email:
         existing = dao.get_by_email(user_update.email)
         if existing:
             raise HTTPException(status_code=400, detail="Ya existe un usuario con ese email")
         sync_email_cognito(target_user.email, user_update.email)
 
+    #Actualizamos el usuario en la BD local
     update_data = user_update.model_dump(exclude_unset=True)
     return dao.update(target_user, update_data)
 
-
+#Ruta para eliminar un usuario, solo el mismo o un admin con el code lo pueden eliminar
 @router.delete("/{user_id}", status_code=204)
 async def eliminar_usuario(
     user_id: int,
     current_user: dict = Depends(verify_jwt),
     master_admin_code: str | None = Header(None, alias="X-Master-Admin-Code"),
     dao=Depends(get_user_dao)
-):
+):  
+    #Buscamos el usuario a eliminar
     target_user = dao.get_by_id(user_id)
     if not target_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
+    #Validamos si el usuario autenticado tiene permisos y hace el deactivate
     current_local_user = resolve_current_local_user(current_user, dao)
     validate_delete_permissions(current_local_user, target_user, master_admin_code)
 
