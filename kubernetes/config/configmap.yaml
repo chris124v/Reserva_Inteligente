@@ -1,6 +1,6 @@
 # El configmap nos sirce para almacenar variables de entorno no sensibles de la aplicación
 
-# apiVersion = Version de la API de Kubernetes que es v1 por defecto
+# apiVersion = Version de la API de Kubernetes que es v1 por defectoa
 # kind = Tipo de recurso que se va a crear, en este caso un configMap
 # metadata = Informacion descriptiva del recurso, como el nombre y el namespace donde vive
 # name = Nombre del ConfigMap que agrupa las variables de configuración
