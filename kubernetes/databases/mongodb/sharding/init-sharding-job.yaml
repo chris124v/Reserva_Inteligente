@@ -1,0 +1,135 @@
+# este archivo es para inicializar el cluster de MongoDB con replicación y sharding en Kubernetes usando un job, podria aplicar esto a los scripts
+
+# Job = Recurso de Kubernetes que ejecuta una tarea una sola vez y termina.
+# Se usa aquí porque la configuración del cluster (replica sets y sharding) solo se hace una vez.
+# kind = Job (tipo de recurso)
+
+# metadata = Información del recurso (nombre mongo-init y namespace reservainteligente)
+
+# spec = Especificaciones del Job
+# template = Plantilla del pod que se ejecutará
+
+# spec.restartPolicy = OnFailure
+# Si el Job falla, Kubernetes lo vuelve a intentar automáticamente
+
+# containers = Lista de contenedores que ejecutan la tarea
+# Se usa imagen mongo:7 porque incluye mongosh para ejecutar comandos de MongoDB
+
+# command = bash -c ejecuta un script en orden paso a paso
+
+# Flujo explicadao
+
+# sleep 20
+# Espera inicial para que todos los pods (config server, shard y mongos) estén levantados
+
+# 1. Inicialización del Config Server (replica set de metadatos)
+# mongosh conecta al nodo mongo-configsvr-0
+# rs.initiate() crea el replica set "configReplSet"
+# configsvr: true indica que este replica set es para metadata de sharding
+# Solo tiene 1 nodo porque el entorno es simplificado
+
+# sleep 15
+# Espera a que el config server elija su primario
+
+# 2. Inicialización del Shard 1 (replica set de datos reales)
+# mongosh conecta al nodo mongors1-0
+# rs.initiate() crea el replica set "mongors1"
+# Se configuran 3 nodos:
+# mongors1-0 → PRIMARY
+# mongors1-1 → SECONDARY
+# mongors1-2 → SECONDARY
+# Este replica set almacena los datos reales de la aplicación
+
+# sleep 10
+# Espera a que el shard esté completamente listo
+
+# 3. Espera activa a mongos (router)
+# until mongosh --host mongos-service...
+# Se usa un loop para verificar que mongos esté listo antes de continuar
+# Esto evita errores de conexión varios y asi
+
+# 4. Registro del shard en el cluster
+# sh.addShard("mongors1/...")
+# Se registra el replica set mongors1 como shard del cluster
+# Esto conecta la capa de datos con el router mongos
+
+# 5. Habilitar sharding en la base de datos
+# sh.enableSharding("reserva_inteligente")
+# Permite que las colecciones dentro de esta base puedan particionarse
+
+# 6. Configuración de sharding en colección menus
+# sh.shardCollection("reserva_inteligente.menus", { restaurante_id: "hashed" })
+# Se define restaurante_id como shard key porque es como el padre
+# "hashed" permite distribución uniforme de datos
+
+# 7. Configuración de sharding en colección reservations
+# Igual que menus, se particiona por restaurante_id
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mongo-init
+  namespace: reservainteligente
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mongo-init
+          image: mongo:7
+          command:
+            - bash
+            - "-c"
+            - |
+              sleep 20
+
+              echo "Inicializando Config Server replica set..."
+              mongosh --host mongo-configsvr-0.mongo-configsvr.reservainteligente.svc.cluster.local:27019 --eval '
+              rs.initiate({
+                _id: "configReplSet",
+                configsvr: true,
+                members: [
+                  { _id: 0, host: "mongo-configsvr-0.mongo-configsvr.reservainteligente.svc.cluster.local:27019" }
+                ]
+              })'
+
+              sleep 15
+
+              echo "Inicializando Shard 1 replica set..."
+              mongosh --host mongors1-0.mongors1.reservainteligente.svc.cluster.local:27017 --eval '
+              rs.initiate({
+                _id: "mongors1",
+                members: [
+                  { _id: 0, host: "mongors1-0.mongors1.reservainteligente.svc.cluster.local:27017" },
+                  { _id: 1, host: "mongors1-1.mongors1.reservainteligente.svc.cluster.local:27017" },
+                  { _id: 2, host: "mongors1-2.mongors1.reservainteligente.svc.cluster.local:27017" }
+                ]
+              })'
+
+              sleep 10
+
+              echo "Esperando mongos..."
+              until mongosh --host mongos-service:27017 --eval "db.adminCommand('ping')" > /dev/null 2>&1; do
+                echo "mongos no listo aún..."
+                sleep 3
+              done
+
+              echo "mongos listo"
+
+              echo "Agregando shard al cluster..."
+              mongosh --host mongos-service:27017 --eval '
+              sh.addShard("mongors1/mongors1-0.mongors1.reservainteligente.svc.cluster.local:27017")'
+
+              echo "Habilitando sharding en la base de datos..."
+              mongosh --host mongos-service:27017 --eval '
+              sh.enableSharding("reserva_inteligente")'
+
+              echo "Configurando sharding en coleccion menus..."
+              mongosh --host mongos-service:27017 --eval '
+              sh.shardCollection("reserva_inteligente.menus", { "restaurante_id": "hashed" })'
+
+              echo "Configurando sharding en coleccion reservations..."
+              mongosh --host mongos-service:27017 --eval '
+              sh.shardCollection("reserva_inteligente.reservations", { "restaurante_id": "hashed" })'
+
+              echo "Inicializacion completada."

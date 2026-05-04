@@ -34,7 +34,9 @@ Write-Host ""
 
 Write-Host "[2/4] Eliminando recursos de bases de datos..." -ForegroundColor Yellow
 kubectl delete -f databases/postgres/ --ignore-not-found=true
-kubectl delete -f databases/mongodb/easy/ --ignore-not-found=true
+kubectl delete -f databases/mongodb/sharding/init-sharding-job.yaml --ignore-not-found=true
+kubectl delete job mongo-init -n reservainteligente --ignore-not-found=true
+kubectl delete -f databases/mongodb/sharding/ --ignore-not-found=true
 Write-Host "OK Recursos eliminados" -ForegroundColor Green
 Write-Host ""
 

@@ -46,6 +46,13 @@ kubectl wait --for=condition=ready pod -l app=mongo-shard1 -n reservainteligente
 Start-Sleep -Seconds 10
 kubectl apply -f databases/mongodb/sharding/mongos-deployment.yaml
 kubectl wait --for=condition=ready pod -l app=mongos -n reservainteligente --timeout=300s 2>$null
+Start-Sleep -Seconds 5
+
+# Ejecutar job de inicializacion para configurar replica sets y sharding
+Write-Host "  Inicializando configuración de sharding (job)..." -ForegroundColor Cyan
+kubectl apply -f databases/mongodb/sharding/init-sharding-job.yaml
+kubectl wait --for=condition=complete job/mongo-init -n reservainteligente --timeout=300s 2>$null
+Write-Host "  Job de inicializacion completado" -ForegroundColor Green
 Write-Host "OK Bases de datos desplegadas" -ForegroundColor Green
 Write-Host ""
 
