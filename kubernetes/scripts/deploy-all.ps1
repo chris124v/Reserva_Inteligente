@@ -34,26 +34,30 @@ kubectl apply -f config/secret.yaml
 Write-Host "OK Configuracion desplegada" -ForegroundColor Green
 Write-Host ""
 
-Write-Host "[4/5] Desplegando bases de datos..." -ForegroundColor Yellow
+Write-Host "[4/6] Desplegando bases de datos..." -ForegroundColor Yellow
 Write-Host "  PostgreSQL..." -ForegroundColor Cyan
 kubectl apply -f databases/postgres/
-Write-Host "  MongoDB..." -ForegroundColor Cyan
-kubectl apply -f databases/mongodb/easy/
+Write-Host "  MongoDB Sharding..." -ForegroundColor Cyan
+kubectl apply -f databases/mongodb/sharding/config-server-statefulset.yaml
+kubectl wait --for=condition=ready pod -l app=mongo-configsvr -n reservainteligente --timeout=300s 2>$null
+Start-Sleep -Seconds 10
+kubectl apply -f databases/mongodb/sharding/shard1-statefulset.yaml
+kubectl wait --for=condition=ready pod -l app=mongo-shard1 -n reservainteligente --timeout=300s 2>$null
+Start-Sleep -Seconds 10
+kubectl apply -f databases/mongodb/sharding/mongos-deployment.yaml
+kubectl wait --for=condition=ready pod -l app=mongos -n reservainteligente --timeout=300s 2>$null
 Write-Host "OK Bases de datos desplegadas" -ForegroundColor Green
 Write-Host ""
 
-Write-Host "[5/5] Esperando a que los pods esten listos..." -ForegroundColor Yellow
+Write-Host "[5/6] Esperando a que los pods esten listos..." -ForegroundColor Yellow
 Start-Sleep -Seconds 10
 kubectl wait --for=condition=ready pod -l app=postgres -n reservainteligente --timeout=300s 2>$null
-kubectl wait --for=condition=ready pod -l app=mongo -n reservainteligente --timeout=300s 2>$null
 kubectl apply -f api/main-api/
 kubectl wait --for=condition=ready pod -l app=main-api -n reservainteligente --timeout=300s 2>$null
 Write-Host "OK Todos los pods estan listos" -ForegroundColor Green
 Write-Host ""
 
-Write-Host "=====================================" -ForegroundColor Green
-Write-Host "  Deployment completado!" -ForegroundColor Green
-Write-Host "=====================================" -ForegroundColor Green
+Write-Host "[6/6] Deployment completado!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Conexiones disponibles:" -ForegroundColor Cyan
 Write-Host "  API:        http://localhost:8000 (con port-forward)" -ForegroundColor White

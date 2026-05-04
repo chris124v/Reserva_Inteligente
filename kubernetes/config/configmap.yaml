@@ -26,7 +26,7 @@ data:
   DATABASE_PORT: "5432"
 
   MONGODB_DB_NAME: "reserva_inteligente"
-  MONGODB_URI: "mongodb://mongo-service:27017"
+  MONGODB_URI: "mongodb://mongos-service:27017"
 
   API_HOST: "0.0.0.0"
   API_PORT: "8000"

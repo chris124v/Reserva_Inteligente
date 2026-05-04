@@ -62,7 +62,7 @@ spec:
           command:
             - mongos
             - "--configdb"
-            - "mongors1conf/mongocfg-0.mongocfg.reservainteligente.svc.cluster.local:27017,mongocfg-1.mongocfg.reservainteligente.svc.cluster.local:27017,mongocfg-2.mongocfg.reservainteligente.svc.cluster.local:27017"
+            - "configReplSet/mongo-configsvr-0.mongo-configsvr.reservainteligente.svc.cluster.local:27019"
             - "--bind_ip_all"
             - "--port"
             - "27017"
