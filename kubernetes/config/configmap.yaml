@@ -35,3 +35,11 @@ data:
 
   JWT_ALGORITHM: "HS256"
   JWT_EXPIRATION_HOURS: "24"
+
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+
+  # REDIS_TTL = Tiempo de vida por defecto de los datos en cache, en segundos
+  REDIS_TTL: "60"
+  # REDIS_ENABLED = Permite activar o desactivar Redis sin cambiar codigo
+  REDIS_ENABLED: "true"

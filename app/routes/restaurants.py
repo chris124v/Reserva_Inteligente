@@ -1,3 +1,5 @@
+from unittest import result
+
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from app.database.session import get_db
@@ -7,6 +9,7 @@ from app.schemas.restaurant import RestaurantCreate, RestaurantUpdate, Restauran
 from app.dao.factory import DAOFactory
 from app.services.user_service import resolve_current_local_user_id
 from app.services.restaurant_service import create_restaurant, validate_restaurant_admin
+from app.services.cache_service import cache_service
 
 # Ruta para gestionar restaurantes 
 router = APIRouter(prefix="/restaurants", tags=["restaurants"])
@@ -51,17 +54,41 @@ async def crear_restaurante(
     if not db_restaurant:
         raise HTTPException(status_code=400, detail="Error al crear el restaurante")
 
+    #Invalida cache 
+    cache_service.delete_pattern("restaurants:*")
+
     return db_restaurant
 
-# Ruta para listar restaurantes
+    
+
+# Ruta para listar restaurantes usando cache de redis
 @router.get("/", response_model=list[RestaurantResponse])
 async def listar_restaurantes(
     limit: int = Query(10, ge=1, le=100),
     skip: int = Query(0, ge=0),
     restaurant_dao=Depends(get_restaurant_dao)
-):
+):  
+    # key unica basada en paginacion
+    cache_key = f"restaurants:all:{skip}:{limit}"
+
+    # Intenta obtener de cache
+    cached_data = cache_service.get(cache_key)
+    if cached_data:
+        print(f"CACHE HIT - {cache_key}")
+        return cached_data
+    
+    print(f"CACHE MISS - {cache_key}")
+
+    #Consulta regular a la bd
     restaurants = restaurant_dao.get_all()
-    return restaurants[skip: skip + limit]
+    result = restaurants[skip: skip + limit]
+
+    # Guarda en cache 
+    cache_service.set(cache_key, result)
+
+    return result
+
+    
 
 # Ruta para actualuzar un restaurante, nuevamente solo el admin que creo el restaurante puede
 @router.put("/{restaurant_id}", response_model=RestaurantResponse)
@@ -92,6 +119,10 @@ async def actualizar_restaurante(
 
     #Actualiza el restaurante
     update_data = restaurant_update.model_dump(exclude_unset=True)
+
+    #Invalida cache
+    cache_service.delete_pattern("restaurants:*")
+
     return restaurant_dao.update(db_restaurant, update_data)
 
 #Metodo para borra el restaurante validamos que el usuario este autenticado y sea el dueno. 
@@ -113,4 +144,8 @@ async def eliminar_restaurante(
     validate_restaurant_admin(user_dao, admin_id, db_restaurant)
 
     restaurant_dao.delete(db_restaurant)
+
+    #Invalida cache, consulta a las dbs asi no a redis
+    cache_service.delete_pattern("restaurants:*")
+
     return None

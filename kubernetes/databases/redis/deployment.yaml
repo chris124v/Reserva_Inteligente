@@ -1,0 +1,66 @@
+# Este seria el archivo para definir como crear y correr redis en k8s
+
+# Redis se va a usar como una capa de cache para guardar respuestas frecuentes de la api como consultas bsasicas de menus, restaurantes etc
+# solo guarda datos temporales en memoria no reemplaza otras bds
+
+# Cache = Datos guardados temporalmente para evitar consultar la base de datos muchas veces
+# TTL = Tiempo de vida de un dato en cache antes de que redis lo elimine automaticamente
+
+# apiVersion = Version de la API de Kubernetes que se usa para crear un Deployment
+apiVersion: apps/v1
+
+# kind Deployment = Recurso que le dice a Kubernetes como crear y mantener corriendo pods de Redis
+kind: Deployment
+
+metadata:
+  name: redis
+  namespace: reservainteligente
+
+spec:
+  
+  # En este caso usamos 1 porque Redis para cache simple puede correr como una sola instancia
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+
+  template:
+    # metadata = Etiquetas que se le asignan al pod para que el selector y el service lo encuentren
+    metadata:
+      labels:
+        app: redis
+
+    spec:
+      containers:
+        - name: redis
+          image: redis:7
+          # Redis usa por defecto el puerto 6379
+          ports:
+            - containerPort: 6379
+
+          # resources = Limites y solicitudes para evitar que Redis consuma recursos excesivos no tenemos muchos recursos disponibles
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+
+          # appendonly yes activa persistencia AOF para que Redis pueda guardar datos en disco
+          # Aunque Redis se use como cache, esto ayuda si el contenedor se reinicia dentro del mismo pod
+          command:
+            - redis-server
+            - "--appendonly"
+            - "yes"
+
+          volumeMounts:
+            - name: redis-storage
+              mountPath: /data
+
+      # emptyDir crea almacenamiento temporal mientras el pod exista
+      # Si el pod se elimina completamente, estos datos se pierden
+      # Para cache esto esta bien porque Redis no es la fuente principal de datos
+      volumes:
+        - name: redis-storage
+          emptyDir: {}

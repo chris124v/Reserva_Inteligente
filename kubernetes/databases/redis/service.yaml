@@ -1,0 +1,28 @@
+# Ya explicamos muchos de estos terminos y es repetir pero aqui hay algunas cosas nuevas
+# El Service permite que otros pods, como la api, puedan conectarse a Redis usando un nombre DNS estable
+
+# DNS interno = Nombre que otros pods pueden usar para conectarse al servicio
+# En este caso la API se conectaria a Redis usando redis-service:6379
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: redis-service
+  namespace: reservainteligente
+
+spec:
+  
+  selector:
+    app: redis
+
+  ports:
+    # port = Puerto expuesto por el Service dentro del cluster
+    - port: 6379
+
+      # targetPort = Puerto real del contenedor Redis
+      targetPort: 6379
+
+  # type ClusterIP = Expone Redis solo dentro del cluster
+  # No necesitamos NodePort ni LoadBalancer porque Redis no debe ser accesible desde fuera
+  type: ClusterIP

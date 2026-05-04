@@ -14,3 +14,4 @@ cryptography==41.0.7 # Requerido por PyJWT para validar tokens RS256 (Cognito)
 requests==2.31.0 # Biblioteca para hacer solicitudes HTTP, útil para pruebas y para interactuar con servicios externos como AWS Cognito
 pymongo==4.17.0 # Biblioteca para interactuar con MongoDB
 dnspython==2.8.0 #Dependencia de pymongo 
+redis==5.0.8 # Biblioteca para interactuar con Redis

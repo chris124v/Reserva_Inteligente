@@ -33,4 +33,13 @@ class Settings:
     #Base a usar
     DATABASE_TYPE: str = os.getenv("DATABASE_TYPE", "postgresql")
 
+    #Settings para Redis
+
+    REDIS_HOST = os.getenv("REDIS_HOST", "redis-service")
+    REDIS_PORT = os.getenv("REDIS_PORT", "6379")
+
+    REDIS_TTL = os.getenv("REDIS_TTL", "60")
+
+    REDIS_ENABLED = os.getenv("REDIS_ENABLED", "true")
+
 settings = Settings()
