@@ -1,0 +1,88 @@
+# Este seria el archivo para definir como crear y correr los Config Servers de mongodb en k8s
+#Esto es como un mapa del cluster, determina que rango de datos estan en el shard y los 3 nodos del config server que forman el replica set y por ende las 3 replicas, pero son metadatos los reales en el shard
+
+# Config Server = Componente de mongodb sharding que almacena los metadatos del cluster (que datos estan en que shard)
+
+# metadata = Nombre del recurso (mongocfg) y namespace donde vive
+
+# serviceName = Apunta al Service headless "mongocfg" para dar DNS estable a cada pod
+# replicas = 3 instancias del config server (mongocfg-0, mongocfg-1, mongocfg-2)
+# selector = Identifica los pods que pertenecen a este StatefulSet usando la etiqueta app: mongocfg
+
+# metadata = Se le asigna la etiqueta app: mongocfg para que el selector los encuentre
+
+# spec.containers = Un contenedor llamado mongocfg usando imagen mongo:7
+# command = Arranca mongod con flags especiales:
+# configsvr = Indica que este nodo es un config server de sharding
+# replSet mongors1conf = Nombre del replica set al que pertenecen los 3 config servers
+# dbpath /data/db = Directorio donde MongoDB guarda sus datos
+# port 27017 = Puerto interno del contenedor
+# bind_ip_all = Acepta conexiones desde cualquier IP dentro del cluster
+
+# volumeMounts = Monta el volumen persistente en /data/db para que los datos sobrevivan reinicios
+
+# volumeClaimTemplates = Crea automaticamente un PVC de 512Mi por cada pod (configsvr-storage-mongocfg-0, etc)
+# ReadWriteOnce = Solo un pod puede escribir en ese volumen a la vez
+
+# kind Service = Expone los pods del config server dentro del cluster
+# clusterIP None = Service headless, no asigna IP virtual sino que da DNS directo a cada pod
+#  Esto permite que mongos encuentre cada nodo individualmente por nombre (mongocfg-0.mongocfg, etc)
+# port 27017 = Puerto por el que otros componentes (mongos) se comunican con los config servers
+
+#En este caso no definimos un service normal con un cluster ip porque ocupamoos que mongos hable con cada nodo por separado, 
+#a eso se le llama headless y permite definir donde esta el replica set
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo-configsvr
+  namespace: reservainteligente
+spec:
+  serviceName: mongo-configsvr
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo-configsvr
+  template:
+    metadata:
+      labels:
+        app: mongo-configsvr
+    spec:
+      containers:
+        - name: mongo-configsvr
+          image: mongo:7
+          command:
+            - mongod
+            - "--configsvr"
+            - "--replSet"
+            - "configReplSet"
+            - "--port"
+            - "27019"
+            - "--bind_ip_all"
+          ports:
+            - containerPort: 27019
+          volumeMounts:
+            - name: configsvr-storage
+              mountPath: /data/configdb
+  volumeClaimTemplates:
+    - metadata:
+        name: configsvr-storage
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-configsvr
+  namespace: reservainteligente
+spec:
+  selector:
+    app: mongo-configsvr
+  ports:
+    - port: 27019
+      targetPort: 27019
+  clusterIP: None

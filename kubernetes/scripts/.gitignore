@@ -1,0 +1,31 @@
+# Archivo .gitignore para la carpeta de scripts
+# Ignora archivos locales y temporales
+
+# Archivos temporales de PowerShell
+*.ps1.bak
+*.ps1.tmp
+*.ps1~
+
+# Archivos de configuración local
+local-config.ps1
+secrets-local.ps1
+
+# Logs locales
+*.log
+
+# Archivos de VS Code
+.vscode/
+*.code-workspace
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+.env.local
+
+# Resultados de tests
+test-results/
+coverage/
+
+# Temp
+temp/
+tmp/

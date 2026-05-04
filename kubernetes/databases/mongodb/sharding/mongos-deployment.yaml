@@ -1,0 +1,83 @@
+# Lo usamos definir para establecer correr el Mongos router de monguito en ks usando un Deployment y un Service
+
+# Mongos = Router del cluster de sharding, es el unico punto de entrada para la API. Consulta el config server para saber a que shard enviar cada query y demas
+
+# Deployment
+
+# apiVersion = apps/v1
+# kind = Deployment, se usa en lugar de StatefulSet porque mongos no almacena datos, no necesita identidad estable ni volumen persistente
+
+# spec.replicas = 1 instancia del router
+# selector = Identifica los pods con la etiqueta app: mongos
+
+# template = Plantilla del pod
+# metadata = Se le asigna la etiqueta app: mongos
+
+# spec.containers = Un contenedor llamado mongos usando imagen mongo:7
+# resources.requests = Recursos minimos garantizados al contenedor (100m CPU, 128Mi memoria)
+# resources.limits = Recursos maximos que puede consumir el contenedor (500m CPU, 512Mi memoria)
+
+# Arranca el mongos con los siguiente comands
+# mongos = Comando del router, diferente a mongod que usan los otros nodos
+# configdb = Indica donde estan los config servers usando sus DNS completos estables
+# Formato que se usa: replSetName/pod-0.service.namespace.svc.cluster.local:puerto, pod-1..., pod-2...
+# por el service headless de mongocfg podemos referenciar cada nodo individualmente
+# bind_ip_all = Acepta conexiones desde cualquier IP dentro del cluster
+# ort 27017 = Puerto interno del contenedor
+
+# ports = Puerto 27017 expuesto por el contenedor
+
+# Service
+
+# kind Service = Expone el mongos dentro del cluster con IP virtual fija 
+# type ClusterIP = Solo accesible dentro del cluster, la API se conecta a este service
+# port 27017 = Puerto por el que la API se comunica con mongos
+# selector app: mongos = Dirige el trafico al pod del mongos
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongos
+  namespace: reservainteligente
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongos
+  template:
+    metadata:
+      labels:
+        app: mongos
+    spec:
+      containers:
+        - name: mongos
+          image: mongo:7
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          command:
+            - mongos
+            - "--configdb"
+            - "mongors1conf/mongocfg-0.mongocfg.reservainteligente.svc.cluster.local:27017,mongocfg-1.mongocfg.reservainteligente.svc.cluster.local:27017,mongocfg-2.mongocfg.reservainteligente.svc.cluster.local:27017"
+            - "--bind_ip_all"
+            - "--port"
+            - "27017"
+          ports:
+            - containerPort: 27017
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongos-service
+  namespace: reservainteligente
+spec:
+  selector:
+    app: mongos
+  ports:
+    - port: 27017
+      targetPort: 27017
+  type: ClusterIP

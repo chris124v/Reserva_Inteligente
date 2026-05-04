@@ -29,7 +29,7 @@
 # accessModes = Tipo de acceso al volumen (ReadWriteOnce)
 # resources.requests.storage = Cantidad de almacenamiento solicitado
 
-# NOTA = StatefulSet garantiza nombres estables de pods y almacenamiento persistente por cada instancia
+# StatefulSet garantiza nombres estables de pods y almacenamiento persistente por cada instancia
 
 
 apiVersion: apps/v1

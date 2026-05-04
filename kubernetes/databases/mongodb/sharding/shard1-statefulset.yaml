@@ -1,0 +1,68 @@
+#aqui definimos como crear y correr los nodos del Shard 1 de MongoDB en ks
+#parte mas relevante del cluster porque definimos como se almacenan los datos con los 3 nodos del shard, osea el replica set estos si son reales
+
+# Shard = Particion del cluster que almacena un subconjunto de los datos totales
+# Cada shard es un replica set de 3 nodos para garantizar alta disponibilidad
+
+# apiVersion = apps/v1
+# kind = StatefulSet, para aplicaciones con estado
+# metadata = Nombre del recurso mongors1 y namespace
+
+#Ya explicamos varios de los comandos en el config server statefulset 
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongors1
+  namespace: reservainteligente
+spec:
+  serviceName: mongors1
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mongors1
+  template:
+    metadata:
+      labels:
+        app: mongors1
+    spec:
+      containers:
+        - name: mongors1
+          image: mongo:7
+          command:
+            - mongod
+            - "--shardsvr"
+            - "--replSet"
+            - "mongors1"
+            - "--dbpath"
+            - "/data/db"
+            - "--port"
+            - "27017"
+            - "--bind_ip_all"
+          ports:
+            - containerPort: 27017
+          volumeMounts:
+            - name: shard1-storage
+              mountPath: /data/db
+  volumeClaimTemplates:
+    - metadata:
+        name: shard1-storage
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongors1
+  namespace: reservainteligente
+spec:
+  selector:
+    app: mongors1
+  clusterIP: None
+  ports:
+    - port: 27017
+      targetPort: 27017
