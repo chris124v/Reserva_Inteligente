@@ -42,7 +42,7 @@ kubectl apply -f databases/mongodb/sharding/config-server-statefulset.yaml
 kubectl wait --for=condition=ready pod -l app=mongo-configsvr -n reservainteligente --timeout=300s 2>$null
 Start-Sleep -Seconds 10
 kubectl apply -f databases/mongodb/sharding/shard1-statefulset.yaml
-kubectl wait --for=condition=ready pod -l app=mongo-shard1 -n reservainteligente --timeout=300s 2>$null
+kubectl wait --for=condition=ready pod -l app=mongors1 -n reservainteligente --timeout=300s 2>$null
 Start-Sleep -Seconds 10
 kubectl apply -f databases/mongodb/sharding/mongos-deployment.yaml
 kubectl wait --for=condition=ready pod -l app=mongos -n reservainteligente --timeout=300s 2>$null
@@ -50,6 +50,7 @@ Start-Sleep -Seconds 5
 
 # Ejecutar job de inicializacion para configurar replica sets y sharding
 Write-Host "  Inicializando configuración de sharding (job)..." -ForegroundColor Cyan
+kubectl delete job mongo-init -n reservainteligente --ignore-not-found=true
 kubectl apply -f databases/mongodb/sharding/init-sharding-job.yaml
 kubectl wait --for=condition=complete job/mongo-init -n reservainteligente --timeout=300s 2>$null
 Write-Host "  Job de inicializacion completado" -ForegroundColor Green
@@ -61,6 +62,19 @@ Start-Sleep -Seconds 10
 kubectl wait --for=condition=ready pod -l app=postgres -n reservainteligente --timeout=300s 2>$null
 kubectl apply -f api/main-api/
 kubectl wait --for=condition=ready pod -l app=main-api -n reservainteligente --timeout=300s 2>$null
+
+Write-Host "  Inicializando esquema PostgreSQL (ORM create_all)..." -ForegroundColor Cyan
+$apiPod = kubectl get pods -n reservainteligente -l app=main-api -o jsonpath='{.items[0].metadata.name}'
+if ([string]::IsNullOrWhiteSpace($apiPod)) {
+    Write-Host "ERROR: no se encontro pod de main-api para inicializar BD" -ForegroundColor Red
+    exit 1
+}
+kubectl exec -n reservainteligente $apiPod -c main-api -- python -m app.database.init_db
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: fallo la inicializacion del esquema PostgreSQL" -ForegroundColor Red
+    exit 1
+}
+Write-Host "  Esquema PostgreSQL inicializado" -ForegroundColor Green
 Write-Host "OK Todos los pods estan listos" -ForegroundColor Green
 Write-Host ""
 

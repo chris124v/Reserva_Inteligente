@@ -8,6 +8,11 @@ Lo primero para hacer por ahora descargar la imagen de docker despues se puede h
 docker build -t reservainteligente-api:v3 .
 
 ```
+Nota: cambiar entre bds asi
+
+```
+kubectl apply -f kubernetes/config/configmap.yaml
+```
 
 ## 1. Desplegar (deploy-all.ps1)
 
@@ -81,6 +86,14 @@ db.test.find()
 Como entramos a postgres y comandos basicos
 
 ```
+
+$pod = kubectl get pods -n reservainteligente -l app=main-api -o jsonpath='{.items[0].metadata.name}'
+kubectl exec -n reservainteligente $pod -c main-api -- python -m app.database.init_db #Iniciar bd si da error
+
+$pod = kubectl get pods -n reservainteligente -l app=main-api -o jsonpath='{.items[0].metadata.name}'; 
+kubectl exec -n reservainteligente $pod -- printenv DATABASE_TYPE #Esto para verificar que si esta en postgres
+
+
 kubectl exec -it postgres-0 -n reservainteligente -- psql -U postgres -d restaurantes_db
 
 \dt

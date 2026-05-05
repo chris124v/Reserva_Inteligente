@@ -30,7 +30,7 @@ if ($ns) {
 Write-Host ""
 
 Write-Host "[3/5] Estado de los pods..." -ForegroundColor Yellow
-kubectl get pods --all-namespaces | Select-String "reservainteligente"
+kubectl get pods -n reservainteligente
 Write-Host ""
 
 Write-Host "[4/5] Servicios..." -ForegroundColor Yellow
@@ -39,9 +39,13 @@ Write-Host "  PostgreSQL: localhost:5432" -ForegroundColor White
 Write-Host "  MongoDB:    localhost:27017" -ForegroundColor White
 Write-Host ""
 
-Write-Host "[5/5] Credenciales..." -ForegroundColor Yellow
+Write-Host "[5/5] Persistencia..." -ForegroundColor Yellow
+kubectl get pvc -n reservainteligente
+Write-Host ""
+kubectl get pv
+Write-Host ""
 Write-Host "PostgreSQL: user=postgres, pass=(revisar secret)" -ForegroundColor Gray
-Write-Host "MongoDB:    (revisar configmap)" -ForegroundColor Gray
+Write-Host "MongoDB:    usa mongos-service dentro del cluster o localhost:27017 con port-forward" -ForegroundColor Gray
 Write-Host ""
 Write-Host "Listo!" -ForegroundColor Green
 Write-Host ""

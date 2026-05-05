@@ -32,6 +32,22 @@
 # StatefulSet garantiza nombres estables de pods y almacenamiento persistente por cada instancia
 
 
+# PersistentVolume para PostgreSQL
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-pv
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /mnt/pv/postgres
+  persistentVolumeReclaimPolicy: Retain
+---
+# StatefulSet de PostgreSQL
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -76,8 +92,10 @@ spec:
     - metadata:
         name: postgres-storage
       spec:
+        storageClassName: ""
         accessModes:
           - ReadWriteOnce
         resources:
           requests:
             storage: 1Gi
+        volumeName: postgres-pv

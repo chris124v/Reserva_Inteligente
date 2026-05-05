@@ -1,0 +1,85 @@
+# Esto es para cuando la base no esta shardeada porque borramos todo en testing
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mongo-init-idempotent
+  namespace: reservainteligente
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mongo-init-idempotent
+          image: mongo:7
+          command:
+            - bash
+            - "-c"
+            - |
+              set -euo pipefail
+
+              echo "Waiting for cluster DNS resolution and mongos..."
+              # wait a bit for services to be discoverable
+              sleep 5
+
+              echo "Checking/initiating config server replica set (idempotent)..."
+              mongosh --host mongo-configsvr-0.mongo-configsvr.reservainteligente.svc.cluster.local:27019 --eval '
+              try{ rs.status(); print("configReplSet:exists"); } catch(e) { rs.initiate({ _id: "configReplSet", configsvr: true, members: [ { _id: 0, host: "mongo-configsvr-0.mongo-configsvr.reservainteligente.svc.cluster.local:27019" } ] }); print("configReplSet:initiated"); }
+              '
+
+              echo "Checking/initiating data shard replica set (mongors1) (idempotent)..."
+              mongosh --host mongors1-0.mongors1.reservainteligente.svc.cluster.local:27017 --eval '
+              try{ rs.status(); print("mongors1:exists"); } catch(e) { rs.initiate({ _id: "mongors1", members: [ { _id: 0, host: "mongors1-0.mongors1.reservainteligente.svc.cluster.local:27017" }, { _id: 1, host: "mongors1-1.mongors1.reservainteligente.svc.cluster.local:27017" }, { _id: 2, host: "mongors1-2.mongors1.reservainteligente.svc.cluster.local:27017" } ] }); print("mongors1:initiated"); }
+              '
+
+              echo "Waiting for mongos to be ready..."
+              until mongosh --host mongos-service:27017 --eval "db.adminCommand('ping')" > /dev/null 2>&1; do
+                echo "mongos not ready yet..."
+                sleep 3
+              done
+
+              echo "Registering shard and enabling sharding/database/collections (idempotent)..."
+              mongosh --host mongos-service:27017 --eval '
+              (function(){
+                const cfg = db.getSiblingDB("config");
+
+                // add shard if missing
+                const shard = cfg.shards.findOne({_id: "mongors1"});
+                if(!shard){
+                  try{
+                    sh.addShard("mongors1/mongors1-0.mongors1.reservainteligente.svc.cluster.local:27017");
+                    print("sh.addShard:ok");
+                  } catch(e){ print("sh.addShard:error:"+e); }
+                } else { print("shard already registered"); }
+
+                // enable sharding for DB if missing
+                const dbEntry = cfg.databases.findOne({_id: "reserva_inteligente"});
+                if(!dbEntry || !dbEntry.partitioned){
+                  try{ sh.enableSharding("reserva_inteligente"); print("enableSharding:ok"); } catch(e){ print("enableSharding:error:"+e); }
+                } else { print("database already sharded"); }
+
+                // collections to shard
+                const colls = ["restaurants","menus","reservations","orders"];
+                colls.forEach(function(coll){
+                  const ns = "reserva_inteligente."+coll;
+                  const collEntry = cfg.collections.findOne({_id: ns});
+                  if(!collEntry){
+                    try{
+                      // create a hashed index on `id` required for hashed shard keys
+                      db.getSiblingDB("reserva_inteligente").getCollection(coll).createIndex({id: "hashed"});
+                    } catch(e){ print("createIndex:"+ns+":"+e); }
+                    try{
+                      sh.shardCollection(ns, { id: "hashed" });
+                      print("sharded:"+ns);
+                    } catch(e){ print("shardCollection:error:"+ns+":"+e); }
+                  } else {
+                    print("already sharded:"+ns);
+                  }
+                });
+              })();
+              '
+
+              echo "Init-sharding job completed successfully (idempotent)."
+              exit 0
+      # tolerates short-lived network issues; if persistent failure, Job will retry
+  backoffLimit: 4

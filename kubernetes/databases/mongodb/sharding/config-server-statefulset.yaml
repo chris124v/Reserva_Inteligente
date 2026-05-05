@@ -32,6 +32,22 @@
 #En este caso no definimos un service normal con un cluster ip porque ocupamoos que mongos hable con cada nodo por separado, 
 #a eso se le llama headless y permite definir donde esta el replica set
 
+# PersistentVolume para Config Server
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongo-configsvr-pv
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 512Mi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /mnt/pv/mongo-configsvr
+  persistentVolumeReclaimPolicy: Retain
+
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -68,11 +84,13 @@ spec:
     - metadata:
         name: configsvr-storage
       spec:
+        storageClassName: ""
         accessModes:
           - ReadWriteOnce
         resources:
           requests:
             storage: 512Mi
+        volumeName: mongo-configsvr-pv
 ---
 apiVersion: v1
 kind: Service
