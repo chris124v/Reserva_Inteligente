@@ -4,9 +4,11 @@ metadata:
   name: nginx-service
   namespace: reservainteligente
 spec:
+  # Service interno para exponer el Nginx balancer dentro del cluster.
   selector:
     app: nginx-balancer
   ports:
     - port: 80
       targetPort: 80
+      # Todo el tráfico entra por este puerto y Nginx lo redirige según la ruta.
   type: ClusterIP

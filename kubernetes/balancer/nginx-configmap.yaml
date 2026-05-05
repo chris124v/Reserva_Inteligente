@@ -9,10 +9,7 @@
 # proxy_pass http://main_api/ = Redirige esas rutas hacia la API quitando el prefijo /api/
 #
 # location /search/ = Captura todas las rutas que empiezan con /search/
-# proxy_pass http://main_api/search/ = Redirige esas rutas hacia los endpoints de búsqueda dentro de la misma API.
-#
-# search está implementado como servicio dentro del código Python de FastAPI,
-# por eso /api/** y /search/** terminan apuntando al mismo servicio api-service.
+# proxy_pass http://search-service/search/ = Redirige esas rutas hacia el microservicio de búsqueda preservando el prefijo /search.
 
 apiVersion: v1
 kind: ConfigMap
@@ -40,7 +37,7 @@ data:
 
             location /search/ {
                 # Ahora /search se enruta al microservicio search-service
-                proxy_pass http://search-service/;
+                proxy_pass http://search-service/search/;
                 proxy_set_header Host $host;
                 proxy_set_header X-Real-IP $remote_addr;
                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

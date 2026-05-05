@@ -226,6 +226,84 @@ Orden recomendado para probar en Swagger:
 3) GET /search/menus/category/{categoria}
 ```
 
+## 12. Nginx Load Balancer
+
+Comandos para aplicar el balanceador de Nginx
+
+```powershell
+kubectl apply -f kubernetes/balancer/nginx-configmap.yaml
+kubectl apply -f kubernetes/balancer/nginx-deployment.yaml
+kubectl apply -f kubernetes/balancer/nginx-service.yaml
+kubectl get pods -n reservainteligente -l app=nginx-balancer
+kubectl get svc -n reservainteligente | Select-String "nginx"
+```
+
+Hacer port-forward para probarlo localmente
+
+```powershell
+kubectl port-forward svc/nginx-service 8080:80 -n reservainteligente
+```
+
+Para probar Nginx solo necesitas el port-forward del `nginx-service`; no hace falta abrir `api-service` ni `search-service` para estas pruebas.
+
+Probar rutas por Nginx
+
+```powershell
+curl -UseBasicParsing http://localhost:8080/api/health
+curl -UseBasicParsing http://localhost:8080/api/restaurants/
+curl -UseBasicParsing http://localhost:8080/search/menus?q=pollo
+curl -UseBasicParsing http://localhost:8080/search/menus/category/pizza
+```
+
+Si lo que quieres es probar Swagger del microservicio de búsqueda, entonces sí debes hacer port-forward directo a `search-service`:
+
+```powershell
+kubectl port-forward svc/search-service 8001:80 -n reservainteligente
+```
+
+Luego abres:
+
+```text
+http://localhost:8001/docs
+```
+
+Orden recomendado para Swagger:
+
+```text
+1) POST /search/reindex
+2) GET /search/menus?q=pollo
+3) GET /search/menus/category/{categoria}
+```
+
+En resumen:
+
+```text
+- Para probar Nginx: solo port-forward del nginx-service.
+- Para probar Swagger: solo port-forward del search-service.
+- No necesitas abrir api-service y search-service al mismo tiempo para validar Nginx.
+```
+
+Si quieres probar Swagger de la API principal, entonces sí usa el port-forward de `api-service`:
+
+```powershell
+kubectl port-forward svc/api-service 8000:80 -n reservainteligente
+```
+
+Luego abres:
+
+```text
+http://localhost:8000/docs
+```
+
+Ahí puedes probar rutas como:
+
+```text
+- GET /restaurants/
+- GET /users/me
+- GET /restaurants/{restaurant_id}
+- GET /users/
+```
+
 
 ## Orden recomendado para inicialiazar
 

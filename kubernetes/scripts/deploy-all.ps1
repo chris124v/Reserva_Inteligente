@@ -94,10 +94,16 @@ kubectl wait --for=condition=ready pod -l app=postgres -n reservainteligente --t
 kubectl apply -f api/main-api/
 # Desplegar search-service
 kubectl apply -f api/search-service/
-kubectl set image deployment/search-service search-service=reservainteligente-search:v2 -n reservainteligente --record || Write-Host "Warning: no se pudo actualizar la imagen del search-service" -ForegroundColor Yellow
+kubectl set image deployment/search-service search-service=reservainteligente-search:v2 -n reservainteligente --record
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Warning: no se pudo actualizar la imagen del search-service" -ForegroundColor Yellow
+}
 kubectl wait --for=condition=ready pod -l app=search-service -n reservainteligente --timeout=120s 2>$null
 # Forzar que el Deployment use la imagen recién construída (útil si el manifest tiene la misma u otra etiqueta)
-kubectl set image deployment/main-api main-api=reservainteligente-api:v7 -n reservainteligente --record || Write-Host "Warning: no se pudo actualizar la imagen con kubectl set image" -ForegroundColor Yellow
+kubectl set image deployment/main-api main-api=reservainteligente-api:v7 -n reservainteligente --record
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Warning: no se pudo actualizar la imagen con kubectl set image" -ForegroundColor Yellow
+}
 kubectl wait --for=condition=ready pod -l app=main-api -n reservainteligente --timeout=300s 2>$null
 
 # Desplegar/actualizar balancer despues de API y search-service

@@ -1,9 +1,11 @@
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nginx-balancer
   namespace: reservainteligente
 spec:
+  # Un solo pod basta para balancear y enrutar las rutas hacia API y search-service.
   replicas: 1
   selector:
     matchLabels:
@@ -15,14 +17,17 @@ spec:
     spec:
       containers:
         - name: nginx
+          # Imagen oficial de Nginx usada como reverse proxy.
           image: nginx:stable
           ports:
             - containerPort: 80
           volumeMounts:
             - name: nginx-config
+              # Monta el nginx.conf definido en el ConfigMap del balancer.
               mountPath: /etc/nginx/nginx.conf
               subPath: nginx.conf
       volumes:
         - name: nginx-config
+          # El ConfigMap contiene las reglas de proxy para /api/** y /search/**.
           configMap:
             name: nginx-config
