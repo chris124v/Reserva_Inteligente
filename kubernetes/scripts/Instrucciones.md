@@ -115,6 +115,69 @@ kubectl delete -f kubernetes/
 kubectl delete pod <nombre> -n reservainteligente
 ```
 
+## 10. Redis
+
+Aqui voy a dejar algunos comandos importantes para interactuar con redis y el resto
+
+Aplicar cambios al cluster
+
+```powershell
+kubectl apply -f kubernetes/databases/redis/ #Tanto a service como deployment
+
+kubectl get pods -n reservainteligente
+kubectl get svc -n reservainteligente
+
+```
+
+Comandos para entrar a la bd de redis y ver las keys
+
+```powershell
+kubectl exec -it deployment/redis -n reservainteligente -- redis-cli
+
+keys *
+ttl restaurants:all:0:10
+get restaurants:all:0:10
+
+```
+
+Comandos para probar endpoints en terminal y ver si hace mis o hit
+
+```
+curl -UseBasicParsing http://localhost:8000/restaurants/
+curl -UseBasicParsing http://localhost:8000/restaurants/
+```
+
+Logs, aqui vemos si hizo hit o miss con el endpoint
+
+```
+kubectl logs deployment/main-api -n reservainteligente --tail=100
+```
+
+## 10. Elastic Search Comandos
+
+Aplicar cambios a los archivos de config
+
+```
+kubectl apply -f kubernetes/databases/elasticsearch/pvc.yaml
+kubectl apply -f kubernetes/databases/elasticsearch/service.yaml
+kubectl apply -f kubernetes/databases/elasticsearch/statefulset.yaml
+```
+
+Revisar pods, service y logs
+
+```
+kubectl get pods -n reservainteligente
+kubectl get svc -n reservainteligente
+kubectl logs elasticsearch-0 -n reservainteligente
+```
+
+Hacer forward del puerto y probarlo
+
+```
+kubectl port-forward service/elasticsearch 9200:9200 -n reservainteligente
+curl http://localhost:9200
+```
+
 
 ## Orden recomendado para inicialiazar
 

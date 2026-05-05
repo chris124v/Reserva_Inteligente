@@ -1,0 +1,50 @@
+# este es el archivo para levantar ElasticSearch en Kubernetes usando un statefulset
+
+# image = Imagen oficial de ElasticSearch que ejecuta el motor de búsqueda
+# discovery.type=single-node = Ejecuta ElasticSearch en modo de un solo nodo asi no gastamos mucho recurso
+# xpack.security.enabled=false = Desactiva autenticación interna para facilitar pruebas locales
+# ES_JAVA_OPTS = Configura la memoria del contenedor (importante para evitar que falle por falta de RAM)
+
+# ports:
+# 9200 = Puerto para consultas hhtp (la api se conecta aquí)
+# 9300 = Puerto interno de ElasticSearch (comunicación entre nodos)
+
+# volumeMounts = Ruta donde ElasticSearch guarda los índices (datos de búsqueda)
+# volumes = Conecta el contenedor con el almacenamiento persistente (PVC)
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch
+  namespace: reservainteligente
+spec:
+  serviceName: elasticsearch
+  replicas: 1
+  selector:
+    matchLabels:
+      app: elasticsearch
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+    spec:
+      containers:
+        - name: elasticsearch
+          image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+          ports:
+            - containerPort: 9200
+            - containerPort: 9300
+          env:
+            - name: discovery.type
+              value: single-node
+            - name: xpack.security.enabled
+              value: "false"
+            - name: ES_JAVA_OPTS
+              value: "-Xms512m -Xmx512m"
+          volumeMounts:
+            - name: elasticsearch-storage
+              mountPath: /usr/share/elasticsearch/data
+      volumes:
+        - name: elasticsearch-storage
+          persistentVolumeClaim:
+            claimName: elasticsearch-pvc

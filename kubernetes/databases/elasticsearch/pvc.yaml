@@ -1,0 +1,13 @@
+#Ya sabemos que esto es para persistencia de datos para elastic 
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: elasticsearch-pvc
+  namespace: reservainteligente
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi

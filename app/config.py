@@ -42,4 +42,6 @@ class Settings:
 
     REDIS_ENABLED = os.getenv("REDIS_ENABLED", "true")
 
+    ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://elasticsearch:9200")
+
 settings = Settings()

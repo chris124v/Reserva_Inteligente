@@ -43,3 +43,5 @@ data:
   REDIS_TTL: "60"
   # REDIS_ENABLED = Permite activar o desactivar Redis sin cambiar codigo
   REDIS_ENABLED: "true"
+
+  ELASTICSEARCH_URL: "http://elasticsearch:9200"
