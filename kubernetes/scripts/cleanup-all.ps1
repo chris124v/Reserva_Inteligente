@@ -49,6 +49,7 @@ Stop-Workload -Kind statefulset -Name mongo-configsvr
 Stop-Workload -Kind statefulset -Name mongors1
 Stop-Workload -Kind statefulset -Name postgres
 Stop-Workload -Kind deployment -Name redis
+Stop-Workload -Kind statefulset -Name elasticsearch
 Write-Host "OK Workloads detenidos" -ForegroundColor Green
 Write-Host ""
 

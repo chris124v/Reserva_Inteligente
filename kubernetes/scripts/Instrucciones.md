@@ -6,6 +6,7 @@ Lo primero para hacer por ahora descargar la imagen de docker despues se puede h
 
 ```powershell
 docker build -t reservainteligente-api:v3 .
+kubectl apply -f kubernetes/api/main-api/deployment.yaml
 
 ```
 Nota: cambiar entre bds asi

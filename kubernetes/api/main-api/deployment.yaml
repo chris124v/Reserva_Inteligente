@@ -51,7 +51,7 @@ spec:
     spec:
       containers:
         - name: main-api
-          image: reservainteligente-api:v3
+          image: reservainteligente-api:v7
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000

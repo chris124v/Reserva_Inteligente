@@ -10,7 +10,7 @@ if (-not (Get-Command kubectl -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-Write-Host "[1/5] Verificando Kubernetes..." -ForegroundColor Yellow
+Write-Host "[1/7] Verificando Kubernetes..." -ForegroundColor Yellow
 kubectl cluster-info --request-timeout=5s 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: Kubernetes no esta corriendo" -ForegroundColor Red
@@ -21,24 +21,43 @@ Write-Host ""
 
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 $kubernetesPath = Split-Path -Parent $scriptPath
+$projectRoot = Split-Path -Parent $kubernetesPath
+Set-Location $projectRoot
+
+Write-Host "[2/7] Construyendo imagen Docker (tag: v7)..." -ForegroundColor Yellow
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+    Write-Host "ERROR: docker no instalado" -ForegroundColor Red
+    exit 1
+}
+# Construir imagen con la etiqueta v7 (usar la misma etiqueta que deployment.yaml)
+docker build -t reservainteligente-api:v7 .
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: fallo la construccion de la imagen Docker" -ForegroundColor Red
+    exit 1
+}
+Write-Host "OK Imagen Docker construida" -ForegroundColor Green
+Write-Host ""
+
 Set-Location $kubernetesPath
 
-Write-Host "[2/5] Desplegando namespaces..." -ForegroundColor Yellow
+Write-Host "[3/7] Desplegando namespaces..." -ForegroundColor Yellow
 kubectl apply -f namespace.yaml
 Write-Host "OK Namespace creado" -ForegroundColor Green
 Write-Host ""
 
-Write-Host "[3/5] Desplegando configuracion..." -ForegroundColor Yellow
+Write-Host "[4/7] Desplegando configuracion..." -ForegroundColor Yellow
 kubectl apply -f config/configmap.yaml
 kubectl apply -f config/secret.yaml
 Write-Host "OK Configuracion desplegada" -ForegroundColor Green
 Write-Host ""
 
-Write-Host "[4/6] Desplegando bases de datos..." -ForegroundColor Yellow
+Write-Host "[5/7] Desplegando bases de datos..." -ForegroundColor Yellow
 Write-Host "  PostgreSQL..." -ForegroundColor Cyan
 kubectl apply -f databases/postgres/
 Write-Host "  Redis..." -ForegroundColor Cyan
 kubectl apply -f databases/redis/
+Write-Host "  Elasticsearch..." -ForegroundColor Cyan
+kubectl apply -f databases/elasticsearch/
 Write-Host "  MongoDB Sharding..." -ForegroundColor Cyan
 kubectl apply -f databases/mongodb/sharding/config-server-statefulset.yaml
 kubectl wait --for=condition=ready pod -l app=mongo-configsvr -n reservainteligente --timeout=300s 2>$null
@@ -59,10 +78,12 @@ Write-Host "  Job de inicializacion completado" -ForegroundColor Green
 Write-Host "OK Bases de datos desplegadas" -ForegroundColor Green
 Write-Host ""
 
-Write-Host "[5/6] Esperando a que los pods esten listos..." -ForegroundColor Yellow
+Write-Host "[6/7] Esperando a que los pods esten listos..." -ForegroundColor Yellow
 Start-Sleep -Seconds 10
 kubectl wait --for=condition=ready pod -l app=postgres -n reservainteligente --timeout=300s 2>$null
 kubectl apply -f api/main-api/
+# Forzar que el Deployment use la imagen recién construída (útil si el manifest tiene la misma u otra etiqueta)
+kubectl set image deployment/main-api main-api=reservainteligente-api:v7 -n reservainteligente --record || Write-Host "Warning: no se pudo actualizar la imagen con kubectl set image" -ForegroundColor Yellow
 kubectl wait --for=condition=ready pod -l app=main-api -n reservainteligente --timeout=300s 2>$null
 
 Write-Host "  Inicializando esquema PostgreSQL (ORM create_all)..." -ForegroundColor Cyan
@@ -80,11 +101,12 @@ Write-Host "  Esquema PostgreSQL inicializado" -ForegroundColor Green
 Write-Host "OK Todos los pods estan listos" -ForegroundColor Green
 Write-Host ""
 
-Write-Host "[6/6] Deployment completado!" -ForegroundColor Green
+Write-Host "[7/7] Deployment completado!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Conexiones disponibles:" -ForegroundColor Cyan
-Write-Host "  API:        http://localhost:8000 (con port-forward)" -ForegroundColor White
-Write-Host "  PostgreSQL: localhost:5432 (postgres/postgres)" -ForegroundColor White
-Write-Host "  Redis:      localhost:6379" -ForegroundColor White
-Write-Host "  MongoDB:    localhost:27017" -ForegroundColor White
+Write-Host "  API:           http://localhost:8000 (con port-forward)" -ForegroundColor White
+Write-Host "  PostgreSQL:    localhost:5432 (postgres/postgres)" -ForegroundColor White
+Write-Host "  Redis:         localhost:6379" -ForegroundColor White
+Write-Host "  MongoDB:       localhost:27017" -ForegroundColor White
+Write-Host "  Elasticsearch: localhost:9200 (con port-forward)" -ForegroundColor White
 Write-Host ""

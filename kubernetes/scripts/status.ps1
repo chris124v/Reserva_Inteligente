@@ -34,10 +34,11 @@ kubectl get pods -n reservainteligente
 Write-Host ""
 
 Write-Host "[4/5] Servicios..." -ForegroundColor Yellow
-Write-Host "  API:        http://localhost:8000 (necesita port-forward)" -ForegroundColor White
-Write-Host "  PostgreSQL: localhost:5432" -ForegroundColor White
-Write-Host "  Redis:      localhost:6379" -ForegroundColor White
-Write-Host "  MongoDB:    localhost:27017" -ForegroundColor White
+Write-Host "  API:           http://localhost:8000 (necesita port-forward)" -ForegroundColor White
+Write-Host "  PostgreSQL:    localhost:5432" -ForegroundColor White
+Write-Host "  Redis:         localhost:6379" -ForegroundColor White
+Write-Host "  MongoDB:       localhost:27017" -ForegroundColor White
+Write-Host "  Elasticsearch: localhost:9200 (necesita port-forward)" -ForegroundColor White
 Write-Host ""
 
 Write-Host "[5/5] Persistencia..." -ForegroundColor Yellow
@@ -45,9 +46,10 @@ kubectl get pvc -n reservainteligente
 Write-Host ""
 kubectl get pv
 Write-Host ""
-Write-Host "PostgreSQL: user=postgres, pass=(revisar secret)" -ForegroundColor Gray
-Write-Host "Redis:      sin autenticacion por defecto" -ForegroundColor Gray
-Write-Host "MongoDB:    usa mongos-service dentro del cluster o localhost:27017 con port-forward" -ForegroundColor Gray
+Write-Host "PostgreSQL:    user=postgres, pass=(revisar secret)" -ForegroundColor Gray
+Write-Host "Redis:         sin autenticacion por defecto" -ForegroundColor Gray
+Write-Host "MongoDB:       usa mongos-service dentro del cluster o localhost:27017 con port-forward" -ForegroundColor Gray
+Write-Host "Elasticsearch: se accede via localhost:9200 con port-forward" -ForegroundColor Gray
 Write-Host ""
 Write-Host "Listo!" -ForegroundColor Green
 Write-Host ""
