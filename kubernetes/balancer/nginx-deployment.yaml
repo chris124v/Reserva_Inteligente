@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-balancer
+  namespace: reservainteligente
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-balancer
+  template:
+    metadata:
+      labels:
+        app: nginx-balancer
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:stable
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: nginx-config

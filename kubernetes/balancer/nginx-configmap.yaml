@@ -1,0 +1,49 @@
+# Este archivo crea un configmap para guardar la configuración de Nginx en Kubernetes.
+
+# nginx.conf = Archivo principal donde Nginx define cómo enrutar las solicitudes, es para rutas no para microservicios porque el search esta integrado no como microservicio.
+#
+# upstream main_api = Define el servicio interno al que Nginx va a enviar tráfico.
+# api-service:80 = Nombre del Service de Kubernetes de la API principal.
+#
+# location /api/ = Captura todas las rutas que empiezan con /api/
+# proxy_pass http://main_api/ = Redirige esas rutas hacia la API quitando el prefijo /api/
+#
+# location /search/ = Captura todas las rutas que empiezan con /search/
+# proxy_pass http://main_api/search/ = Redirige esas rutas hacia los endpoints de búsqueda dentro de la misma API.
+#
+# search está implementado como servicio dentro del código Python de FastAPI,
+# por eso /api/** y /search/** terminan apuntando al mismo servicio api-service.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: reservainteligente
+data:
+  nginx.conf: |
+    events {}
+
+    http {
+        upstream main_api {
+            server api-service:80;
+        }
+
+        server {
+            listen 80;
+
+            location /api/ {
+                proxy_pass http://main_api/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            }
+
+            location /search/ {
+                # Ahora /search se enruta al microservicio search-service
+                proxy_pass http://search-service/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            }
+        }
+    }

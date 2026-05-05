@@ -6,7 +6,6 @@ from .routes.restaurants import router as restaurants_router
 from .routes.menus import router as menus_router
 from .routes.reservations import router as reservations_router
 from .routes.orders import router as orders_router
-from app.routes import search
 from .config import settings
 
 app = FastAPI(
@@ -29,7 +28,6 @@ app.include_router(restaurants_router)
 app.include_router(menus_router)
 app.include_router(reservations_router)
 app.include_router(orders_router)
-app.include_router(search.router)
 
 @app.get("/")
 async def root():

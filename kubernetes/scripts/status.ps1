@@ -35,6 +35,8 @@ Write-Host ""
 
 Write-Host "[4/5] Servicios..." -ForegroundColor Yellow
 Write-Host "  API:           http://localhost:8000 (necesita port-forward)" -ForegroundColor White
+Write-Host "  Search docs:   http://localhost:8001/docs (port-forward a search-service)" -ForegroundColor White
+Write-Host "  Nginx:         http://localhost:8080 (port-forward a nginx-service)" -ForegroundColor White
 Write-Host "  PostgreSQL:    localhost:5432" -ForegroundColor White
 Write-Host "  Redis:         localhost:6379" -ForegroundColor White
 Write-Host "  MongoDB:       localhost:27017" -ForegroundColor White
@@ -50,6 +52,8 @@ Write-Host "PostgreSQL:    user=postgres, pass=(revisar secret)" -ForegroundColo
 Write-Host "Redis:         sin autenticacion por defecto" -ForegroundColor Gray
 Write-Host "MongoDB:       usa mongos-service dentro del cluster o localhost:27017 con port-forward" -ForegroundColor Gray
 Write-Host "Elasticsearch: se accede via localhost:9200 con port-forward" -ForegroundColor Gray
+Write-Host "Search:        se accede via localhost:8001 con port-forward a search-service" -ForegroundColor Gray
+Write-Host "Nginx:         se accede via localhost:8080 con port-forward a nginx-service" -ForegroundColor Gray
 Write-Host ""
 Write-Host "Listo!" -ForegroundColor Green
 Write-Host ""

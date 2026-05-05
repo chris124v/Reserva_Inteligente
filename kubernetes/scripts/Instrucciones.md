@@ -176,7 +176,54 @@ Hacer forward del puerto y probarlo
 
 ```
 kubectl port-forward service/elasticsearch 9200:9200 -n reservainteligente
+kubectl port-forward svc/search-service 8001:80 -n reservainteligente
 curl http://localhost:9200
+```
+
+## 11. Search Service (Microservicio)
+
+Construir imagen local del microservicio de busqueda
+
+```powershell
+docker build -t reservainteligente-search:v2 -f search_service/Dockerfile .
+```
+
+Aplicar deployment y service del search-service
+
+```powershell
+kubectl apply -f kubernetes/api/search-service/
+kubectl set image deployment/search-service search-service=reservainteligente-search:v2 -n reservainteligente
+kubectl rollout restart deployment/search-service -n reservainteligente
+kubectl rollout status deployment/search-service -n reservainteligente
+kubectl get pods -n reservainteligente -l app=search-service
+kubectl get svc -n reservainteligente
+```
+
+Ver logs si hay errores (CrashLoopBackOff / ImagePull)
+
+```powershell
+kubectl logs -n reservainteligente deployment/search-service --tail=200
+kubectl describe pod -n reservainteligente -l app=search-service
+```
+
+Probar en Swagger del search-service
+
+```powershell
+kubectl port-forward svc/search-service 8001:80 -n reservainteligente
+```
+
+Abrir en navegador:
+
+```text
+http://localhost:8001/docs
+```
+
+Orden recomendado para probar en Swagger:
+
+```text
+1) POST /search/reindex
+2) GET /search/menus?q=pollo
+3) GET /search/menus/category/{categoria}
 ```
 
 

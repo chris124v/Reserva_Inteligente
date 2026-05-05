@@ -44,6 +44,8 @@ Set-Location $kubernetesPath
 
 Write-Host "[1/4] Deteniendo workloads..." -ForegroundColor Yellow
 Stop-Workload -Kind deployment -Name main-api
+Stop-Workload -Kind deployment -Name search-service
+Stop-Workload -Kind deployment -Name nginx-balancer
 Stop-Workload -Kind deployment -Name mongos
 Stop-Workload -Kind statefulset -Name mongo-configsvr
 Stop-Workload -Kind statefulset -Name mongors1

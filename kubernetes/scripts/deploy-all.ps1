@@ -24,7 +24,7 @@ $kubernetesPath = Split-Path -Parent $scriptPath
 $projectRoot = Split-Path -Parent $kubernetesPath
 Set-Location $projectRoot
 
-Write-Host "[2/7] Construyendo imagen Docker (tag: v7)..." -ForegroundColor Yellow
+Write-Host "[2/7] Construyendo imagenes Docker..." -ForegroundColor Yellow
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     Write-Host "ERROR: docker no instalado" -ForegroundColor Red
     exit 1
@@ -36,6 +36,16 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 Write-Host "OK Imagen Docker construida" -ForegroundColor Green
+Write-Host ""
+
+# Construir imagen del search-service (microservicio separado)
+Write-Host "  Search-service (v2)..." -ForegroundColor Cyan
+docker build -t reservainteligente-search:v2 -f search_service/Dockerfile .
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: fallo la construccion de la imagen Docker del search-service" -ForegroundColor Red
+    exit 1
+}
+Write-Host "OK Imagen search-service construida" -ForegroundColor Green
 Write-Host ""
 
 Set-Location $kubernetesPath
@@ -82,9 +92,17 @@ Write-Host "[6/7] Esperando a que los pods esten listos..." -ForegroundColor Yel
 Start-Sleep -Seconds 10
 kubectl wait --for=condition=ready pod -l app=postgres -n reservainteligente --timeout=300s 2>$null
 kubectl apply -f api/main-api/
+# Desplegar search-service
+kubectl apply -f api/search-service/
+kubectl set image deployment/search-service search-service=reservainteligente-search:v2 -n reservainteligente --record || Write-Host "Warning: no se pudo actualizar la imagen del search-service" -ForegroundColor Yellow
+kubectl wait --for=condition=ready pod -l app=search-service -n reservainteligente --timeout=120s 2>$null
 # Forzar que el Deployment use la imagen recién construída (útil si el manifest tiene la misma u otra etiqueta)
 kubectl set image deployment/main-api main-api=reservainteligente-api:v7 -n reservainteligente --record || Write-Host "Warning: no se pudo actualizar la imagen con kubectl set image" -ForegroundColor Yellow
 kubectl wait --for=condition=ready pod -l app=main-api -n reservainteligente --timeout=300s 2>$null
+
+# Desplegar/actualizar balancer despues de API y search-service
+kubectl apply -f balancer/
+kubectl wait --for=condition=ready pod -l app=nginx-balancer -n reservainteligente --timeout=120s 2>$null
 
 Write-Host "  Inicializando esquema PostgreSQL (ORM create_all)..." -ForegroundColor Cyan
 $apiPod = kubectl get pods -n reservainteligente -l app=main-api -o jsonpath='{.items[0].metadata.name}'
@@ -105,6 +123,8 @@ Write-Host "[7/7] Deployment completado!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Conexiones disponibles:" -ForegroundColor Cyan
 Write-Host "  API:           http://localhost:8000 (con port-forward)" -ForegroundColor White
+Write-Host "  Search docs:   http://localhost:8001/docs (port-forward a search-service)" -ForegroundColor White
+Write-Host "  Nginx:         http://localhost:8080 (port-forward a nginx-service)" -ForegroundColor White
 Write-Host "  PostgreSQL:    localhost:5432 (postgres/postgres)" -ForegroundColor White
 Write-Host "  Redis:         localhost:6379" -ForegroundColor White
 Write-Host "  MongoDB:       localhost:27017" -ForegroundColor White
