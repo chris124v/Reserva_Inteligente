@@ -4,6 +4,7 @@
 import json
 from app.database.redis import get_redis
 from app.config import settings
+from fastapi.encoders import jsonable_encoder
 
 
 class CacheService:
@@ -32,15 +33,14 @@ class CacheService:
 
     #Guarda un valor en redis usando una key y el TTL definido
     def set(self, key: str, value):
-        
-        #Sino pasa nada, no pasa nada
         if not self.enabled:
             return
 
         try:
-            self.redis.setex(key, self.ttl, json.dumps(value)) #Guarda la key con el tiempo de expiracion que definimos, pasa de python a json
-        except Exception:
-            pass
+            encoded_value = jsonable_encoder(value)
+            self.redis.setex(key, self.ttl, json.dumps(encoded_value))
+        except Exception as e:
+            print(f"ERROR SET CACHE - {key}: {e}")
     
     #Elimina una key especifica de redis
     def delete(self, key: str):

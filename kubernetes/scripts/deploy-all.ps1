@@ -37,6 +37,8 @@ Write-Host ""
 Write-Host "[4/6] Desplegando bases de datos..." -ForegroundColor Yellow
 Write-Host "  PostgreSQL..." -ForegroundColor Cyan
 kubectl apply -f databases/postgres/
+Write-Host "  Redis..." -ForegroundColor Cyan
+kubectl apply -f databases/redis/
 Write-Host "  MongoDB Sharding..." -ForegroundColor Cyan
 kubectl apply -f databases/mongodb/sharding/config-server-statefulset.yaml
 kubectl wait --for=condition=ready pod -l app=mongo-configsvr -n reservainteligente --timeout=300s 2>$null
@@ -83,5 +85,6 @@ Write-Host ""
 Write-Host "Conexiones disponibles:" -ForegroundColor Cyan
 Write-Host "  API:        http://localhost:8000 (con port-forward)" -ForegroundColor White
 Write-Host "  PostgreSQL: localhost:5432 (postgres/postgres)" -ForegroundColor White
+Write-Host "  Redis:      localhost:6379" -ForegroundColor White
 Write-Host "  MongoDB:    localhost:27017" -ForegroundColor White
 Write-Host ""
