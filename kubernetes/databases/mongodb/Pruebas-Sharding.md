@@ -35,7 +35,7 @@ mongors1-2 = SECONDARY
 Aqui indicamos como entrar al servicio de mongos y ver el replica set
 
 ``` powershell
-kubectl exec -it mongos-76f489dbbc-tnsz6 -n reservainteligente -- mongosh #Entrar 
+kubectl exec -it mongos-76f489dbbc-nw5tj -n reservainteligente -- mongosh #Entrar 
 
 use reserva_inteligente
 db.menus.getShardDistribution()

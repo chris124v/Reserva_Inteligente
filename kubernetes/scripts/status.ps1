@@ -43,7 +43,7 @@ Write-Host "  MongoDB:       localhost:27017" -ForegroundColor White
 Write-Host "  Elasticsearch: localhost:9200 (necesita port-forward)" -ForegroundColor White
 Write-Host ""
 
-Write-Host "[5/5] Persistencia..." -ForegroundColor Yellow
+Write-Host "[5/6] Persistencia..." -ForegroundColor Yellow
 kubectl get pvc -n reservainteligente
 Write-Host ""
 kubectl get pv
@@ -54,6 +54,11 @@ Write-Host "MongoDB:       usa mongos-service dentro del cluster o localhost:270
 Write-Host "Elasticsearch: se accede via localhost:9200 con port-forward" -ForegroundColor Gray
 Write-Host "Search:        se accede via localhost:8001 con port-forward a search-service" -ForegroundColor Gray
 Write-Host "Nginx:         se accede via localhost:8080 con port-forward a nginx-service" -ForegroundColor Gray
+Write-Host ""
+Write-Host "[6/6] Esquema PostgreSQL..." -ForegroundColor Yellow
+kubectl exec postgres-0 -n reservainteligente -- psql -U postgres -d restaurantes_db -c "\\dt"
+Write-Host ""
+Write-Host "Nota: el deploy crea/verifica tablas con ORM; los registros de ejemplo se cargan aparte desde los seeds." -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "Listo!" -ForegroundColor Green
 Write-Host ""

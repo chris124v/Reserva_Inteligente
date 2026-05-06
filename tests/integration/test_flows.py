@@ -1,24 +1,17 @@
-"""
-Integration tests para flujos completos del sistema.
-Pruebas que validan la interacción entre múltiples servicios.
-
-Categoría: INTEGRACIÓN
-Cobertura esperada: >80% de flujos principales
-"""
+# Pruebas de integración para flujos completos del sistema.
+# Validan la interacción entre múltiples servicios.
 
 import pytest
 from datetime import datetime, timedelta
 
 
-# ==================== FLUJO: CREAR RESERVA ====================
+# Flujo para crear una reserva
 
 @pytest.mark.integration
 class TestReservationFlowIntegration:
-    """Tests de integración para flujo de creación de reserva."""
-    
     def test_complete_reservation_flow(self, users_data, restaurants_data, reservations_data):
         """
-        FLUJO COMPLETO:
+        flujo completo:
         1. Usuario se autentica
         2. Consulta restaurante disponible
         3. Crea reserva
@@ -26,7 +19,7 @@ class TestReservationFlowIntegration:
         5. Se envía notificación
         """
         # Arrange
-        user = users_data[0]  # primer cliente
+        user = next(user for user in users_data if user["rol"] == "cliente")
         restaurant = restaurants_data[0]
         
         # Act & Assert - Paso 1: Autenticar
@@ -35,7 +28,7 @@ class TestReservationFlowIntegration:
         
         # Paso 2: Consultar disponibilidad de restaurante
         assert restaurant["total_mesas"] > 0
-        assert restaurant["activo"] != False or restaurant["activo"] is None
+        assert restaurant.get("activo", True) is not False
         
         # Paso 3: Crear reserva
         reservation_data = {
@@ -52,8 +45,8 @@ class TestReservationFlowIntegration:
         # Paso 5: Validar notificación quedaría pendiente
         # (En integración real, verificar cola de eventos)
     
+    # Verifica que la disponibilidad de mesas sea coherente.
     def test_reservation_availability_check(self, restaurants_data):
-        """Verificar disponibilidad de mesas en restaurante."""
         restaurant = restaurants_data[0]
         
         # Simular búsqueda de disponibilidad
@@ -65,15 +58,14 @@ class TestReservationFlowIntegration:
         assert total_mesas >= 1
 
 
-# ==================== FLUJO: CREAR ORDEN ====================
+# Flujdo para crear una orden 
 
 @pytest.mark.integration
 class TestOrderFlowIntegration:
-    """Tests de integración para flujo de creación de orden."""
-    
+    # Verifica el flujo base de una orden con un restaurante con menús disponibles.
     def test_complete_order_flow(self, users_data, restaurants_data, menus_data, orders_data):
         """
-        FLUJO COMPLETO:
+        flujo completo:
         1. Usuario se autentica
         2. Consulta menús de restaurante
         3. Selecciona items
@@ -83,7 +75,7 @@ class TestOrderFlowIntegration:
         7. Se genera notificación
         """
         # Arrange
-        user = users_data[1]  # cliente
+        user = next(user for user in users_data if user["rol"] == "cliente")
         restaurant = restaurants_data[0]
         
         # Act & Assert - Paso 1: Autenticar
@@ -115,8 +107,8 @@ class TestOrderFlowIntegration:
         estado_esperado = "confirmada"
         assert estado_esperado in ["confirmada", "en_preparacion"]
     
+    # Verifica el cálculo del total cuando se combinan varios menús.
     def test_order_calculation_with_multiple_items(self, menus_data):
-        """Verificar cálculo de orden con múltiples items."""
         # Arrange
         items_to_order = [
             {"menu": menus_data[0], "quantity": 1},
@@ -134,16 +126,15 @@ class TestOrderFlowIntegration:
         assert tax == int(subtotal * 0.08)
 
 
-# ==================== FLUJO: BÚSQUEDA Y FILTRADO ====================
+# Busqueda y fltradores
 
 @pytest.mark.integration
 @pytest.mark.search
 class TestSearchFlowIntegration:
-    """Tests de integración para búsqueda y filtrado."""
-    
+    # Verifica que la búsqueda por categoría encuentre restaurantes relacionados.
     def test_search_restaurants_by_category(self, restaurants_data, menus_data):
         """
-        FLUJO: Cliente busca restaurantes por categoría de comida.
+        flujo completo:
         1. Usuario ingresa término de búsqueda
         2. Sistema filtra restaurantes
         3. Retorna resultados con menús
@@ -167,8 +158,8 @@ class TestSearchFlowIntegration:
         # Assert
         assert len(matching_restaurants) > 0
     
+    # Verifica que el filtro por calificación mínima funcione.
     def test_filter_restaurants_by_rating(self, restaurants_data):
-        """Filtrar restaurantes por calificación mínima."""
         # Arrange
         min_rating = 4.5
         
@@ -179,8 +170,8 @@ class TestSearchFlowIntegration:
         for restaurant in high_rated:
             assert restaurant["rating"] >= min_rating
     
+    # Verifica que el filtro por horario no falle con datos reales.
     def test_filter_restaurants_by_hours(self, restaurants_data):
-        """Filtrar restaurantes que estén abiertos a una hora específica."""
         from datetime import datetime
         
         # Arrange
@@ -200,16 +191,15 @@ class TestSearchFlowIntegration:
         # (depende de los datos)
 
 
-# ==================== FLUJO: NOTIFICACIONES Y CACHE ====================
+# Notificaciones y cache
 
 @pytest.mark.integration
 @pytest.mark.cache
 class TestCacheAndNotificationsIntegration:
-    """Tests de integración para caché y notificaciones."""
-    
+    # Verifica que una actualización invalide y recargue la cache.
     def test_restaurant_cache_invalidation(self, restaurants_data):
         """
-        FLUJO: 
+        flujo completo:
         1. Se carga restaurante en caché
         2. Se actualiza información
         3. Se invalida caché
@@ -238,8 +228,8 @@ class TestCacheAndNotificationsIntegration:
         cache[cache_key] = restaurant_updated
         assert cache[cache_key]["rating"] == 4.9
     
+    # Verifica que la disponibilidad del menú se pueda guardar en cache.
     def test_menu_availability_cache(self, menus_data):
-        """Caché de disponibilidad de menús."""
         # Arrange
         menu = menus_data[0]
         cache_key = f"menu:disponibilidad:{menu['id']}"
@@ -252,14 +242,12 @@ class TestCacheAndNotificationsIntegration:
         assert cache[cache_key]["disponible"] == menu["disponible"]
 
 
-# ==================== FLUJO: VALIDACIONES DE NEGOCIO ====================
+# Validaciones de negocio varias
 
 @pytest.mark.integration
 class TestBusinessRulesIntegration:
-    """Tests de integración para reglas de negocio."""
-    
+    # Verifica que no se pueda reservar una fecha pasada.
     def test_cannot_reserve_past_date(self):
-        """No se puede crear reserva con fecha pasada."""
         from datetime import datetime, timedelta
         
         # Arrange
@@ -269,8 +257,8 @@ class TestBusinessRulesIntegration:
         # En integración real, debería lanzar excepción
         assert past_date < datetime.now().date()
     
+    # Verifica que un menú no disponible no se tome como válido.
     def test_cannot_order_unavailable_menu(self, menus_data):
-        """No se puede ordenar un menú no disponible."""
         # Arrange
         unavailable_menus = [m for m in menus_data if m["disponible"] is False]
         
@@ -281,8 +269,8 @@ class TestBusinessRulesIntegration:
             assert menu["disponible"] is False
             # En integración real, el sistema rechazaría esta orden
     
+    # Verifica que no se exceda la capacidad estimada del restaurante.
     def test_cannot_exceed_restaurant_capacity(self, restaurants_data):
-        """No se puede reservar más personas que la capacidad."""
         # Arrange
         restaurant = restaurants_data[0]
         total_mesas = restaurant["total_mesas"]
@@ -297,17 +285,17 @@ class TestBusinessRulesIntegration:
         # En integración real, el sistema rechazaría esta reserva
 
 
-# ==================== FLUJO: CONCURRENCIA ====================
+# Flujo de concurrencia
 
 @pytest.mark.integration
 @pytest.mark.slow
 class TestConcurrencyIntegration:
-    """Tests de integración para casos concurrentes."""
-    
+    # Verifica que dos reservas al mismo recurso no se acepten a la vez.
     def test_simultaneous_reservations_same_table(self, restaurants_data, reservations_data):
         """
-        ESCENARIO: Dos usuarios reservan la misma mesa simultáneamente.
-        Sistema debe manejar esto correctamente (solo una debe pasar).
+        flujo completo:
+        dos usuarios reservan la misma mesa simultáneamente.
+        Sistema debe manejar esto correctamente, solo uno pasa.
         """
         # Arrange
         restaurant = restaurants_data[0]
@@ -335,6 +323,32 @@ class TestConcurrencyIntegration:
         # Assert
         assert not second_success  # Segunda falla
         assert len(reserved_tables) == 1  # Solo una mesa
+
+
+# Varios casos de flujo de prueba importantes
+@pytest.mark.integration
+class TestAdditionalFlowIntegration:
+    # Verifica que un usuario inactivo no pueda participar en un flujo de reserva.
+    def test_inactive_user_cannot_start_reservation_flow(self, users_data, restaurants_data):
+        inactive_user = next(user for user in users_data if user["activo"] is False)
+        restaurant = restaurants_data[0]
+
+        assert inactive_user["activo"] is False
+        assert restaurant["total_mesas"] > 0
+        assert inactive_user["rol"] == "cliente"
+
+    # Verifica que una búsqueda por categoría inexistente no devuelva restaurantes.
+    def test_search_category_without_matches_returns_empty(self, restaurants_data, menus_data):
+        search_category = "vegetariana"
+
+        restaurants_with_category = set()
+        for menu in menus_data:
+            if menu["categoria"] == search_category and menu["disponible"]:
+                restaurants_with_category.add(menu["restaurante_id"])
+
+        matching_restaurants = [r for r in restaurants_data if r["id"] in restaurants_with_category]
+
+        assert matching_restaurants == []
 
 
 if __name__ == "__main__":

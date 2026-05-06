@@ -242,6 +242,8 @@ Hacer port-forward para probarlo localmente
 
 ```powershell
 kubectl port-forward svc/nginx-service 8080:80 -n reservainteligente
+
+kubectl logs -f -n reservainteligente deployment/nginx-balancer --tail=200
 ```
 
 Para probar Nginx solo necesitas el port-forward del `nginx-service`; no hace falta abrir `api-service` ni `search-service` para estas pruebas.
@@ -253,12 +255,6 @@ curl -UseBasicParsing http://localhost:8080/api/health
 curl -UseBasicParsing http://localhost:8080/api/restaurants/
 curl -UseBasicParsing http://localhost:8080/search/menus?q=pollo
 curl -UseBasicParsing http://localhost:8080/search/menus/category/pizza
-```
-
-Si lo que quieres es probar Swagger del microservicio de búsqueda, entonces sí debes hacer port-forward directo a `search-service`:
-
-```powershell
-kubectl port-forward svc/search-service 8001:80 -n reservainteligente
 ```
 
 Luego abres:

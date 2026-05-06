@@ -29,8 +29,13 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     Write-Host "ERROR: docker no instalado" -ForegroundColor Red
     exit 1
 }
-# Construir imagen con la etiqueta v7 (usar la misma etiqueta que deployment.yaml)
-docker build -t reservainteligente-api:v7 .
+# Generar tags unicos por despliegue para evitar que Kubernetes reutilice una imagen vieja con el mismo tag
+$buildStamp = Get-Date -Format "yyyyMMddHHmmss"
+$apiImageTag = "v7-$buildStamp"
+$searchImageTag = "v2-$buildStamp"
+
+# Construir imagen sin cache para evitar que queden archivos borrados de capas anteriores
+docker build --no-cache -t "reservainteligente-api:$apiImageTag" .
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: fallo la construccion de la imagen Docker" -ForegroundColor Red
     exit 1
@@ -38,9 +43,9 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "OK Imagen Docker construida" -ForegroundColor Green
 Write-Host ""
 
-# Construir imagen del search-service (microservicio separado)
+# Construir imagen del search-service (microservicio separado) sin cache para mantenerla alineada al codigo actual
 Write-Host "  Search-service (v2)..." -ForegroundColor Cyan
-docker build -t reservainteligente-search:v2 -f search_service/Dockerfile .
+docker build --no-cache -t "reservainteligente-search:$searchImageTag" -f search_service/Dockerfile .
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: fallo la construccion de la imagen Docker del search-service" -ForegroundColor Red
     exit 1
@@ -94,13 +99,13 @@ kubectl wait --for=condition=ready pod -l app=postgres -n reservainteligente --t
 kubectl apply -f api/main-api/
 # Desplegar search-service
 kubectl apply -f api/search-service/
-kubectl set image deployment/search-service search-service=reservainteligente-search:v2 -n reservainteligente --record
+kubectl set image deployment/search-service search-service="reservainteligente-search:$searchImageTag" -n reservainteligente --record
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Warning: no se pudo actualizar la imagen del search-service" -ForegroundColor Yellow
 }
 kubectl wait --for=condition=ready pod -l app=search-service -n reservainteligente --timeout=120s 2>$null
 # Forzar que el Deployment use la imagen recién construída (útil si el manifest tiene la misma u otra etiqueta)
-kubectl set image deployment/main-api main-api=reservainteligente-api:v7 -n reservainteligente --record
+kubectl set image deployment/main-api main-api="reservainteligente-api:$apiImageTag" -n reservainteligente --record
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Warning: no se pudo actualizar la imagen con kubectl set image" -ForegroundColor Yellow
 }
@@ -111,9 +116,10 @@ kubectl apply -f balancer/
 kubectl wait --for=condition=ready pod -l app=nginx-balancer -n reservainteligente --timeout=120s 2>$null
 
 Write-Host "  Inicializando esquema PostgreSQL (ORM create_all)..." -ForegroundColor Cyan
-$apiPod = kubectl get pods -n reservainteligente -l app=main-api -o jsonpath='{.items[0].metadata.name}'
+# Buscar un pod que este en estado Running, no Completed o Succeeded
+$apiPod = kubectl get pods -n reservainteligente -l app=main-api --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>$null
 if ([string]::IsNullOrWhiteSpace($apiPod)) {
-    Write-Host "ERROR: no se encontro pod de main-api para inicializar BD" -ForegroundColor Red
+    Write-Host "ERROR: no se encontro pod de main-api en estado Running para inicializar BD" -ForegroundColor Red
     exit 1
 }
 kubectl exec -n reservainteligente $apiPod -c main-api -- python -m app.database.init_db
