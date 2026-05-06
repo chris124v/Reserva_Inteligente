@@ -1,0 +1,4 @@
+"""
+Docker Compose configuration para integration tests.
+Define los servicios necesarios (MongoDB, PostgreSQL, Redis, Elasticsearch).
+"""

@@ -1,0 +1,12 @@
+[
+  {"id": 1, "email": "admin@demo.com", "nombre": "María Rodríguez García", "password_hash": "hashed_password_1", "rol": "admin", "activo": true, "created_at": "2026-01-15T10:00:00"},
+  {"id": 2, "email": "cliente1@demo.com", "nombre": "Carlos Jiménez López", "password_hash": "hashed_password_2", "rol": "cliente", "activo": true, "created_at": "2026-02-01T15:30:00"},
+  {"id": 3, "email": "admin2@demo.com", "nombre": "Luis Fernández Morales", "password_hash": "hashed_password_3", "rol": "admin", "activo": true, "created_at": "2026-01-20T12:45:00"},
+  {"id": 4, "email": "cliente2@demo.com", "nombre": "Ana López Sánchez", "password_hash": "hashed_password_4", "rol": "cliente", "activo": true, "created_at": "2026-02-10T09:20:00"},
+  {"id": 5, "email": "cliente3@demo.com", "nombre": "Pedro Vargas Fernández", "password_hash": "hashed_password_5", "rol": "cliente", "activo": true, "created_at": "2026-02-15T14:00:00"},
+  {"id": 6, "email": "cliente4@demo.com", "nombre": "Sofía Romero Castro", "password_hash": "hashed_password_6", "rol": "cliente", "activo": true, "created_at": "2026-02-20T11:30:00"},
+  {"id": 7, "email": "admin3@demo.com", "nombre": "Roberto Martínez Torres", "password_hash": "hashed_password_7", "rol": "admin", "activo": true, "created_at": "2026-01-25T16:15:00"},
+  {"id": 8, "email": "cliente5@demo.com", "nombre": "Alejandra Quesada Salazar", "password_hash": "hashed_password_8", "rol": "cliente", "activo": true, "created_at": "2026-02-25T13:45:00"},
+  {"id": 9, "email": "inactivo@demo.com", "nombre": "Juan Pérez Delgado", "password_hash": "hashed_password_9", "rol": "cliente", "activo": false, "created_at": "2026-01-10T10:00:00"},
+  {"id": 10, "email": "cliente6@demo.com", "nombre": "Daniela Campos González", "password_hash": "hashed_password_10", "rol": "cliente", "activo": true, "created_at": "2026-03-01T08:00:00"}
+]
