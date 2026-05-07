@@ -1,0 +1,48 @@
+name: CI/CD Reserva Inteligente
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+
+env:
+  REGISTRY: ghcr.io
+  MAIN_API_IMAGE: ${{ github.repository }}-main-api
+  SEARCH_SERVICE_IMAGE: ${{ github.repository }}-search-service
+
+jobs:
+  build-images:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Convert repository name to lowercase
+        run: |
+          echo "MAIN_API_IMAGE_LC=$(echo '${{ env.MAIN_API_IMAGE }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          echo "SEARCH_SERVICE_IMAGE_LC=$(echo '${{ env.SEARCH_SERVICE_IMAGE }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Build main API Docker image
+        run: |
+          docker build \
+            -t $REGISTRY/$MAIN_API_IMAGE_LC:${{ github.sha }} \
+            -t $REGISTRY/$MAIN_API_IMAGE_LC:latest \
+            -f Dockerfile .
+
+      - name: Build search service Docker image
+        run: |
+          docker build \
+            -t $REGISTRY/$SEARCH_SERVICE_IMAGE_LC:${{ github.sha }} \
+            -t $REGISTRY/$SEARCH_SERVICE_IMAGE_LC:latest \
+            -f search_service/Dockerfile .
