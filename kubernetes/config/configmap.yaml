@@ -18,7 +18,7 @@ data:
   AWS_COGNITO_USER_POOL_ID: "us-east-2_72geNIkP2"
   AWS_COGNITO_CLIENT_ID: "341rr52jt9s0291t3aoe9cqdsa"
 
-  DATABASE_TYPE: "postgresql"
+  DATABASE_TYPE: "mongodb"
 
   DATABASE_USER: "postgres"
   DATABASE_NAME: "restaurantes_db"
