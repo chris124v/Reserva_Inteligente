@@ -58,7 +58,8 @@ jobs:
             tests/integration/test_redis.py \
             tests/integration/test_search_endpoints.py \
             tests/integration/test_nginx.py \
-            tests/integration/test_mongodb.py
+            tests/integration/test_mongodb.py \
+            tests/integration/test_flows.py
 
   build-and-publish-images:
     name: Build and Publish Docker Images
