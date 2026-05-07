@@ -1,4 +1,4 @@
-# deploy-all.ps1 - Crea y despliega todo el ambiente de Reserva Inteligente en Kubernetes
+# deploy-all.ps1 - Crea y despliega todo el ambiente de Reserva Inteligente en Kubernetes usando imagenes GHCR
 
 Write-Host "=====================================" -ForegroundColor Cyan
 Write-Host "  Reserva Inteligente - Deployment Script  " -ForegroundColor Cyan
@@ -21,43 +21,17 @@ Write-Host ""
 
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 $kubernetesPath = Split-Path -Parent $scriptPath
-$projectRoot = Split-Path -Parent $kubernetesPath
-Set-Location $projectRoot
-
-Write-Host "[2/7] Construyendo imagenes Docker..." -ForegroundColor Yellow
-if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-    Write-Host "ERROR: docker no instalado" -ForegroundColor Red
-    exit 1
-}
-# Generar tags unicos por despliegue para evitar que Kubernetes reutilice una imagen vieja con el mismo tag
-$buildStamp = Get-Date -Format "yyyyMMddHHmmss"
-$apiImageTag = "v8-$buildStamp"
-$searchImageTag = "v3-$buildStamp"
-
-# Construir imagen sin cache para evitar que queden archivos borrados de capas anteriores
-docker build --no-cache -t "reservainteligente-api:$apiImageTag" .
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "ERROR: fallo la construccion de la imagen Docker" -ForegroundColor Red
-    exit 1
-}
-Write-Host "OK Imagen Docker construida" -ForegroundColor Green
-Write-Host ""
-
-# Construir imagen del search-service (microservicio separado) sin cache para mantenerla alineada al codigo actual
-Write-Host "  Search-service (v2)..." -ForegroundColor Cyan
-docker build --no-cache -t "reservainteligente-search:$searchImageTag" -f search_service/Dockerfile .
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "ERROR: fallo la construccion de la imagen Docker del search-service" -ForegroundColor Red
-    exit 1
-}
-Write-Host "OK Imagen search-service construida" -ForegroundColor Green
-Write-Host ""
-
 Set-Location $kubernetesPath
 
-Write-Host "[3/7] Desplegando namespaces..." -ForegroundColor Yellow
+Write-Host "[2/7] Verificando uso de imagenes GHCR..." -ForegroundColor Yellow
+Write-Host "OK Las imagenes se descargaran desde GitHub Container Registry:" -ForegroundColor Green
+Write-Host "  ghcr.io/chris124v/reserva_inteligente-main-api:latest" -ForegroundColor Cyan
+Write-Host "  ghcr.io/chris124v/reserva_inteligente-search-service:latest" -ForegroundColor Cyan
+Write-Host ""
+
+Write-Host "[3/7] Desplegando namespace..." -ForegroundColor Yellow
 kubectl apply -f namespace.yaml
-Write-Host "OK Namespace creado" -ForegroundColor Green
+Write-Host "OK Namespace creado/verificado" -ForegroundColor Green
 Write-Host ""
 
 Write-Host "[4/7] Desplegando configuracion..." -ForegroundColor Yellow
@@ -67,66 +41,72 @@ Write-Host "OK Configuracion desplegada" -ForegroundColor Green
 Write-Host ""
 
 Write-Host "[5/7] Desplegando bases de datos..." -ForegroundColor Yellow
+
 Write-Host "  PostgreSQL..." -ForegroundColor Cyan
 kubectl apply -f databases/postgres/
+
 Write-Host "  Redis..." -ForegroundColor Cyan
 kubectl apply -f databases/redis/
+
 Write-Host "  Elasticsearch..." -ForegroundColor Cyan
 kubectl apply -f databases/elasticsearch/
+
 Write-Host "  MongoDB Sharding..." -ForegroundColor Cyan
 kubectl apply -f databases/mongodb/sharding/config-server-statefulset.yaml
 kubectl wait --for=condition=ready pod -l app=mongo-configsvr -n reservainteligente --timeout=300s 2>$null
 Start-Sleep -Seconds 10
+
 kubectl apply -f databases/mongodb/sharding/shard1-statefulset.yaml
 kubectl wait --for=condition=ready pod -l app=mongors1 -n reservainteligente --timeout=300s 2>$null
 Start-Sleep -Seconds 10
+
 kubectl apply -f databases/mongodb/sharding/mongos-deployment.yaml
 kubectl wait --for=condition=ready pod -l app=mongos -n reservainteligente --timeout=300s 2>$null
 Start-Sleep -Seconds 5
 
-# Ejecutar job de inicializacion para configurar replica sets y sharding
-Write-Host "  Inicializando configuración de sharding (job)..." -ForegroundColor Cyan
+Write-Host "  Inicializando configuracion de sharding (job)..." -ForegroundColor Cyan
 kubectl delete job mongo-init -n reservainteligente --ignore-not-found=true
 kubectl apply -f databases/mongodb/sharding/init-sharding-job.yaml
 kubectl wait --for=condition=complete job/mongo-init -n reservainteligente --timeout=300s 2>$null
 Write-Host "  Job de inicializacion completado" -ForegroundColor Green
+
 Write-Host "OK Bases de datos desplegadas" -ForegroundColor Green
 Write-Host ""
 
-Write-Host "[6/7] Esperando a que los pods esten listos..." -ForegroundColor Yellow
+Write-Host "[6/7] Desplegando API, search-service y balanceador..." -ForegroundColor Yellow
 Start-Sleep -Seconds 10
+
 kubectl wait --for=condition=ready pod -l app=postgres -n reservainteligente --timeout=300s 2>$null
+
+Write-Host "  Main API..." -ForegroundColor Cyan
 kubectl apply -f api/main-api/
-# Desplegar search-service
-kubectl apply -f api/search-service/
-kubectl set image deployment/search-service search-service="reservainteligente-search:$searchImageTag" -n reservainteligente --record
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Warning: no se pudo actualizar la imagen del search-service" -ForegroundColor Yellow
-}
-kubectl wait --for=condition=ready pod -l app=search-service -n reservainteligente --timeout=120s 2>$null
-# Forzar que el Deployment use la imagen recién construída (útil si el manifest tiene la misma u otra etiqueta)
-kubectl set image deployment/main-api main-api="reservainteligente-api:$apiImageTag" -n reservainteligente --record
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Warning: no se pudo actualizar la imagen con kubectl set image" -ForegroundColor Yellow
-}
+kubectl rollout restart deployment/main-api -n reservainteligente
 kubectl wait --for=condition=ready pod -l app=main-api -n reservainteligente --timeout=300s 2>$null
 
-# Desplegar/actualizar balancer despues de API y search-service
+Write-Host "  Search Service..." -ForegroundColor Cyan
+kubectl apply -f api/search-service/
+kubectl rollout restart deployment/search-service -n reservainteligente
+kubectl wait --for=condition=ready pod -l app=search-service -n reservainteligente --timeout=180s 2>$null
+
+Write-Host "  Nginx Balancer..." -ForegroundColor Cyan
 kubectl apply -f balancer/
-kubectl wait --for=condition=ready pod -l app=nginx-balancer -n reservainteligente --timeout=120s 2>$null
+kubectl rollout restart deployment/nginx-balancer -n reservainteligente
+kubectl wait --for=condition=ready pod -l app=nginx-balancer -n reservainteligente --timeout=180s 2>$null
 
 Write-Host "  Inicializando esquema PostgreSQL (ORM create_all)..." -ForegroundColor Cyan
-# Buscar un pod que este en estado Running, no Completed o Succeeded
 $apiPod = kubectl get pods -n reservainteligente -l app=main-api --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>$null
+
 if ([string]::IsNullOrWhiteSpace($apiPod)) {
     Write-Host "ERROR: no se encontro pod de main-api en estado Running para inicializar BD" -ForegroundColor Red
     exit 1
 }
+
 kubectl exec -n reservainteligente $apiPod -c main-api -- python -m app.database.init_db
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: fallo la inicializacion del esquema PostgreSQL" -ForegroundColor Red
     exit 1
 }
+
 Write-Host "  Esquema PostgreSQL inicializado" -ForegroundColor Green
 Write-Host "OK Todos los pods estan listos" -ForegroundColor Green
 Write-Host ""

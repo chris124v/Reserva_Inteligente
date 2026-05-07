@@ -51,8 +51,8 @@ spec:
     spec:
       containers:
         - name: main-api
-          image: reservainteligente-api:v7
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/chris124v/reserva_inteligente-main-api:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8000
           resources:

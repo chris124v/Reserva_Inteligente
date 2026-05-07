@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
         - name: search-service
-          image: reservainteligente-search:v2
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/chris124v/reserva_inteligente-search-service:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8000
           env:
