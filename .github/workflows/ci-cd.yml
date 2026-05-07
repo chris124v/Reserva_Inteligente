@@ -52,6 +52,7 @@ jobs:
             --cov=app.models \
             --cov-report=term-missing \
             tests/unit
+            tests/integration/test_redis.py
 
   build-and-publish-images:
     name: Build and Publish Docker Images
