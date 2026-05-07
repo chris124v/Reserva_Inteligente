@@ -6,6 +6,7 @@ from .routes.restaurants import router as restaurants_router
 from .routes.menus import router as menus_router
 from .routes.reservations import router as reservations_router
 from .routes.orders import router as orders_router
+import socket
 from .config import settings
 
 app = FastAPI(
@@ -40,3 +41,10 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+@app.get("/instance")
+def instance():
+    return {
+        "service": "main-api",
+        "hostname": socket.gethostname()
+    }

@@ -44,3 +44,11 @@ pytest --cov=app.services --cov=app.schemas --cov=app.models --cov-report=html t
 pytest --cov=app --cov-report=html tests/integration
 # Abre: htmlcov/index.html
 ```
+
+## 6. Coverage para todo 
+
+```
+python -m pytest --cov=app --cov-report=term tests/unit tests/integration -q
+
+python -m pytest --cov=app --cov-report=term --cov-report=html tests/unit tests/integration -q #En html
+```

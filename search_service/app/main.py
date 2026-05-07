@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from app.routes.search import router as search_router
+import socket
 
 app = FastAPI(
     title="Search Service",
@@ -16,3 +17,10 @@ async def health():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+@app.get("/instance")
+def instance():
+    return {
+        "service": "search-service",
+        "hostname": socket.gethostname()
+    }

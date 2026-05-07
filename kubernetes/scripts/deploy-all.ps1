@@ -31,8 +31,8 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
 }
 # Generar tags unicos por despliegue para evitar que Kubernetes reutilice una imagen vieja con el mismo tag
 $buildStamp = Get-Date -Format "yyyyMMddHHmmss"
-$apiImageTag = "v7-$buildStamp"
-$searchImageTag = "v2-$buildStamp"
+$apiImageTag = "v8-$buildStamp"
+$searchImageTag = "v3-$buildStamp"
 
 # Construir imagen sin cache para evitar que queden archivos borrados de capas anteriores
 docker build --no-cache -t "reservainteligente-api:$apiImageTag" .

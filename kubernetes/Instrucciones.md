@@ -5,9 +5,9 @@ En este markdown de instrucciones incluimos muchos de los comandos para ver dato
 Lo primero para hacer por ahora descargar la imagen de docker despues se puede hacer todo lo demas, esto es con el dockerfile.
 
 ```powershell
-docker build -t reservainteligente-api:v3 .
+docker build -t reservainteligente-api:v7 .
 kubectl apply -f kubernetes/api/main-api/deployment.yaml
-
+kubectl apply -f kubernetes/api/search-service/deployment.yaml
 ```
 Nota: cambiar entre bds asi
 
@@ -263,42 +263,52 @@ Luego abres:
 http://localhost:8001/docs
 ```
 
-Orden recomendado para Swagger:
+## 13. Escalabilidad con KS
 
-```text
-1) POST /search/reindex
-2) GET /search/menus?q=pollo
-3) GET /search/menus/category/{categoria}
+Para probar desde NGINX, faltaria con search porque no esta mapeado en config map 
+
+```
+kubectl port-forward svc/nginx-service 8080:80 -n reservainteligente
+
+curl -UseBasicParsing http://localhost:8080/api/instance
+curl -UseBasicParsing http://localhost:8080/api/instance
+curl -UseBasicParsing http://localhost:8080/api/instance
+curl -UseBasicParsing http://localhost:8080/api/instance
+curl -UseBasicParsing http://localhost:8080/api/instance
+
 ```
 
-En resumen:
+Probar desde el service de api
 
-```text
-- Para probar Nginx: solo port-forward del nginx-service.
-- Para probar Swagger: solo port-forward del search-service.
-- No necesitas abrir api-service y search-service al mismo tiempo para validar Nginx.
 ```
-
-Si quieres probar Swagger de la API principal, entonces sí usa el port-forward de `api-service`:
-
-```powershell
 kubectl port-forward svc/api-service 8000:80 -n reservainteligente
+
+curl -UseBasicParsing http://localhost:8000/instance
+curl -UseBasicParsing http://localhost:8000/instance
+curl -UseBasicParsing http://localhost:8000/instance
 ```
 
-Luego abres:
+Probar desde el servicio de busqueda
 
-```text
-http://localhost:8000/docs
+```
+kubectl port-forward svc/search-service 8001:80 -n reservainteligente
+
+kubectl logs search-service-667747b5b7-9p5mm -n reservainteligente --tail=20
+kubectl logs search-service-667747b5b7-dd8n4 -n reservainteligente --tail=20
+kubectl logs search-service-667747b5b7-tp2vf -n reservainteligente --tail=20
+
+curl -UseBasicParsing http://localhost:8001/instance
+curl -UseBasicParsing http://localhost:8001/instance
+curl -UseBasicParsing http://localhost:8001/instance
+curl -UseBasicParsing http://localhost:8001/instance
 ```
 
-Ahí puedes probar rutas como:
+Validar pods escalados, deberia haber 3 replica por cada servicio de api
 
-```text
-- GET /restaurants/
-- GET /users/me
-- GET /restaurants/{restaurant_id}
-- GET /users/
 ```
+kubectl get pods -n reservainteligente
+```
+
 
 
 ## Orden recomendado para inicialiazar
