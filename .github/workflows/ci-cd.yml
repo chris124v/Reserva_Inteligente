@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - master
+
   pull_request:
     branches:
       - main
@@ -16,9 +17,39 @@ env:
   SEARCH_SERVICE_IMAGE: ${{ github.repository }}-search-service
 
 jobs:
+
+  tests:
+    name: Unit Tests + Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r app/requirements.txt
+
+      - name: Run unit tests with coverage
+        run: |
+          pytest \
+            --cov=app.services \
+            --cov=app.schemas \
+            --cov=app.models \
+            --cov-report=term-missing \
+            tests/unit
+
   build-and-publish-images:
     name: Build and Publish Docker Images
     runs-on: ubuntu-latest
+
+    needs: tests
 
     permissions:
       contents: read
