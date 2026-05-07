@@ -13,6 +13,7 @@ Nota: cambiar entre bds asi
 
 ```
 kubectl apply -f kubernetes/config/configmap.yaml
+kubectl get configmap app-config -n reservainteligente -o jsonpath='{.data.DATABASE_TYPE}' ; Write-Host ""
 ```
 
 ## 1. Desplegar (deploy-all.ps1)
@@ -74,13 +75,19 @@ kubectl logs -f -l app=main-api -n reservainteligente #Ver logs
 
 Como entramos a mongo y comandos basicos
 
-```
-kubectl exec -it mongo-0 -n reservainteligente -- mongosh
+```powershell
+# Opción 1: Por Mongos 
+kubectl exec -it mongos-76f489dbbc-w5f67 -n reservainteligente -- mongosh
 
+# Opción 2: Directamente a una replica del shard
+kubectl exec -it mongors1-0 -n reservainteligente -- mongosh
+
+# Dentro de mongosh:
 use reserva_inteligente
 show collections
-db.test.find()
-
+db.restaurants.find().pretty()
+db.restaurants.countDocuments()
+rs.status()  # Ver estado del replica set
 ```
 ## 8. Postgres
 
