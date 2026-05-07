@@ -61,7 +61,8 @@ jobs:
             tests/integration/test_nginx.py \
             tests/integration/test_mongodb.py \
             tests/integration/test_flows.py \
-            tests/integration/test_daos.py
+            tests/integration/test_daos.py \
+            tests/integration/test_auth_cognito.py
 
   build-and-publish-images:
     name: Build and Publish Docker Images
