@@ -50,10 +50,13 @@ jobs:
             --cov=app.services \
             --cov=app.schemas \
             --cov=app.models \
+            --cov=app.routes \
+            --cov=search_service.app \
             --cov-report=term-missing \
             tests/unit \
             tests/integration/test_redis.py \
-            tests/integration/test_search_endpoints.py
+            tests/integration/test_search_endpoints.py \
+            tests/integration/test_nginx.py
 
   build-and-publish-images:
     name: Build and Publish Docker Images
