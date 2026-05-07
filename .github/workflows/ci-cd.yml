@@ -16,8 +16,8 @@ env:
   SEARCH_SERVICE_IMAGE: ${{ github.repository }}-search-service
 
 jobs:
-  build-images:
-    name: Build Docker Images
+  build-and-publish-images:
+    name: Build and Publish Docker Images
     runs-on: ubuntu-latest
 
     permissions:
@@ -33,6 +33,11 @@ jobs:
           echo "MAIN_API_IMAGE_LC=$(echo '${{ env.MAIN_API_IMAGE }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
           echo "SEARCH_SERVICE_IMAGE_LC=$(echo '${{ env.SEARCH_SERVICE_IMAGE }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
+      - name: Login to GitHub Container Registry
+        if: github.event_name == 'push'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
       - name: Build main API Docker image
         run: |
           docker build \
@@ -40,9 +45,21 @@ jobs:
             -t $REGISTRY/$MAIN_API_IMAGE_LC:latest \
             -f Dockerfile .
 
+      - name: Push main API Docker image
+        if: github.event_name == 'push'
+        run: |
+          docker push $REGISTRY/$MAIN_API_IMAGE_LC:${{ github.sha }}
+          docker push $REGISTRY/$MAIN_API_IMAGE_LC:latest
+
       - name: Build search service Docker image
         run: |
           docker build \
             -t $REGISTRY/$SEARCH_SERVICE_IMAGE_LC:${{ github.sha }} \
             -t $REGISTRY/$SEARCH_SERVICE_IMAGE_LC:latest \
             -f search_service/Dockerfile .
+
+      - name: Push search service Docker image
+        if: github.event_name == 'push'
+        run: |
+          docker push $REGISTRY/$SEARCH_SERVICE_IMAGE_LC:${{ github.sha }}
+          docker push $REGISTRY/$SEARCH_SERVICE_IMAGE_LC:latest
