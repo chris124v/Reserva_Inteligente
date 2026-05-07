@@ -16,6 +16,14 @@ env:
   MAIN_API_IMAGE: ${{ github.repository }}-main-api
   SEARCH_SERVICE_IMAGE: ${{ github.repository }}-search-service
 
+  AWS_REGION: us-east-1
+  AWS_COGNITO_REGION: us-east-1
+  COGNITO_USER_POOL_ID: fake-pool
+  AWS_COGNITO_USER_POOL_ID: fake-pool
+  COGNITO_CLIENT_ID: fake-client
+  AWS_COGNITO_CLIENT_ID: fake-client
+  DATABASE_TYPE: postgresql
+
 jobs:
 
   tests:
@@ -25,12 +33,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-        env:
-          AWS_REGION: us-east-1
-          COGNITO_USER_POOL_ID: fake-pool
-          COGNITO_CLIENT_ID: fake-client
-          DATABASE_TYPE: postgresql
 
       - name: Setup Python
         uses: actions/setup-python@v5
