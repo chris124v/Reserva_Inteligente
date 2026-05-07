@@ -22,6 +22,8 @@ env:
   AWS_COGNITO_USER_POOL_ID: fake-pool
   COGNITO_CLIENT_ID: fake-client
   AWS_COGNITO_CLIENT_ID: fake-client
+  COGNITO_CLIENT_SECRET: fake-secret
+  AWS_COGNITO_CLIENT_SECRET: fake-secret
   DATABASE_TYPE: postgresql
 
 jobs:
