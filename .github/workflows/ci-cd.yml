@@ -52,6 +52,7 @@ jobs:
             --cov=app.models \
             --cov=app.routes \
             --cov=app.dao \
+            --cov=app.auth \
             --cov=search_service.app \
             --cov-report=term-missing \
             tests/unit \
