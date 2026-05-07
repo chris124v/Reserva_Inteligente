@@ -15,6 +15,8 @@ En este proyecto se realiza un sistema de backend complejo que integra CI/CD, mo
 
 ## Link Video
 
+En este link estaria todo, el video, el pdf y todo el codigo.
+
 [Video demostrativo en Google Drive](https://drive.google.com/drive/folders/1J_ET9XwiZcyDbQ3yPgwX-SdUKT5qofYV?usp=sharing)
 
 ---
