@@ -51,7 +51,7 @@ jobs:
             --cov=app.schemas \
             --cov=app.models \
             --cov-report=term-missing \
-            tests/unit
+            tests/unit \
             tests/integration/test_redis.py
 
   build-and-publish-images:
