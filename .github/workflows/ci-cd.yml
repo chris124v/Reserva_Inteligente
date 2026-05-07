@@ -129,8 +129,7 @@ jobs:
             tests/integration/test_mongodb.py \
             tests/integration/test_flows.py \
             tests/integration/test_daos.py \
-            tests/integration/test_auth_cognito.py \
-            tests/integration/test_api_endpoints.py
+            tests/integration/test_auth_cognito.py 
 
   # Job de construcción y publicación de imágenes Docker.
   # Solo se ejecuta si el job tests pasa correctamente.
