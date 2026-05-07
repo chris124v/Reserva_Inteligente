@@ -26,6 +26,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+        env:
+          AWS_REGION: us-east-1
+          COGNITO_USER_POOL_ID: fake-pool
+          COGNITO_CLIENT_ID: fake-client
+          DATABASE_TYPE: postgresql
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
