@@ -394,7 +394,7 @@ Luego acceder en `http://localhost/api/docs` y `http://localhost/search/docs`.
 
 ---
 
-## Cambiar el Motor de Base de Datos
+## Paso 5: Cambiar el Motor de Base de Datos
 
 El patrón DAO permite cambiar entre PostgreSQL y MongoDB sin modificar el código:
 
@@ -421,7 +421,7 @@ Tambien podemos hacer git push para subir todo a GHCR y despues hacer deploy all
 
 ---
 
-## Ejecutar las Pruebas
+## Paso 6: Ejecutar las Pruebas
 
 Esto tambien se puede comprobar en el CI/CD cuando hacemos el git push entonces o se prueba localmente o lo vemos en el github actions. 
 
@@ -436,6 +436,13 @@ python -m pytest tests/integration/test_api_endpoints.py tests/integration/test_
 # Cobertura global
 python -m pytest --cov=app --cov-report=term tests/unit tests/integration -q
 ```
+
+## Paso 7: Seeding de la BD
+
+Primero crear 5 usuarios.
+
+Dos admins y 3 clientes. A partir de eso se puede correr una seed con datos de prueba que se encuentra en la carpeta data.
+Entrar a instrucciones_seed.md para ejecutar cada archivo de seeding tanto para postgres como para mongodb.
 
 ---
 
