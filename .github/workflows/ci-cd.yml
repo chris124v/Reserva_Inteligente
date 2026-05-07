@@ -28,7 +28,7 @@ on:
 # Se usan valores fake para que los tests puedan inicializar CognitoClient sin conectarse a AWS real.
 # Los tests de Cognito usan mocks, por lo que no se exponen credenciales reales.
 #
-# DATABASE_TYPE = Define el motor por defecto para los tests.
+# DATABASE_TYPE = Define el motor por defecto para los tests. prueba
 env:
   REGISTRY: ghcr.io
   MAIN_API_IMAGE: ${{ github.repository }}-main-api
