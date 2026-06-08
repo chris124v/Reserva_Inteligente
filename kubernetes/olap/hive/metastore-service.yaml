@@ -1,0 +1,14 @@
+# Service del Hive Metastore
+# Puerto 9083: Thrift protocol - usado por HiveServer2 y Spark para acceder a los metadatos
+apiVersion: v1
+kind: Service
+metadata:
+  name: hive-metastore
+  namespace: reservainteligente
+spec:
+  selector:
+    app: hive-metastore
+  ports:
+    - name: thrift
+      port: 9083
+      targetPort: 9083

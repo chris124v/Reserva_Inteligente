@@ -1,0 +1,15 @@
+# Service del PostgreSQL del Hive Metastore
+# ClusterIP None (headless) para StatefulSet con DNS estable
+# Solo accesible dentro del cluster, no expuesto externamente
+apiVersion: v1
+kind: Service
+metadata:
+  name: hive-metastore-db
+  namespace: reservainteligente
+spec:
+  selector:
+    app: hive-metastore-db
+  clusterIP: None
+  ports:
+    - port: 5432
+      targetPort: 5432

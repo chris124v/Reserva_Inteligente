@@ -1,0 +1,20 @@
+# Service del HDFS DataNode
+# ClusterIP None (headless) para StatefulSet
+# Puerto 9864: Web UI
+# Puerto 9866: Transferencia de bloques de datos
+apiVersion: v1
+kind: Service
+metadata:
+  name: hdfs-datanode
+  namespace: reservainteligente
+spec:
+  selector:
+    app: hdfs-datanode
+  clusterIP: None
+  ports:
+    - name: webui
+      port: 9864
+      targetPort: 9864
+    - name: data
+      port: 9866
+      targetPort: 9866

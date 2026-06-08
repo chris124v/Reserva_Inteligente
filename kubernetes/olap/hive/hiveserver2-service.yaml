@@ -1,0 +1,18 @@
+# Service de HiveServer2
+# Puerto 10000: JDBC - para conectar con beeline, DBeaver, Spark o cualquier cliente JDBC
+# Puerto 10002: Web UI - para ver queries en ejecucion en el navegador
+apiVersion: v1
+kind: Service
+metadata:
+  name: hiveserver2
+  namespace: reservainteligente
+spec:
+  selector:
+    app: hiveserver2
+  ports:
+    - name: jdbc
+      port: 10000
+      targetPort: 10000
+    - name: webui
+      port: 10002
+      targetPort: 10002

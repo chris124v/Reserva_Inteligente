@@ -1,0 +1,72 @@
+# PersistentVolume para HDFS DataNode
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: hdfs-datanode-pv
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /mnt/pv/hdfs-datanode
+  persistentVolumeReclaimPolicy: Retain
+---
+# StatefulSet del HDFS DataNode
+# El DataNode almacena los bloques de datos reales del sistema de archivos distribuido
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: hdfs-datanode
+  namespace: reservainteligente
+spec:
+  serviceName: hdfs-datanode
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hdfs-datanode
+  template:
+    metadata:
+      labels:
+        app: hdfs-datanode
+    spec:
+      containers:
+        - name: hdfs-datanode
+          image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+          ports:
+            - containerPort: 9864
+              name: webui
+            - containerPort: 9866
+              name: data
+          env:
+            - name: CORE_CONF_fs_defaultFS
+              value: "hdfs://hdfs-namenode:9000"
+            - name: HDFS_CONF_dfs_replication
+              value: "1"
+            - name: HDFS_CONF_dfs_datanode_data_dir
+              value: "file:///hadoop/dfs/data"
+            # Necesario para que el DataNode se registre con el NameNode correctamente
+            - name: SERVICE_PRECONDITION
+              value: "hdfs-namenode:9870"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          volumeMounts:
+            - name: hdfs-datanode-storage
+              mountPath: /hadoop/dfs/data
+  volumeClaimTemplates:
+    - metadata:
+        name: hdfs-datanode-storage
+      spec:
+        storageClassName: ""
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 5Gi
+        volumeName: hdfs-datanode-pv

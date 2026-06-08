@@ -1,0 +1,69 @@
+# PersistentVolume para HDFS NameNode
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: hdfs-namenode-pv
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /mnt/pv/hdfs-namenode
+  persistentVolumeReclaimPolicy: Retain
+---
+# StatefulSet del HDFS NameNode
+# El NameNode gestiona el sistema de archivos distribuido (namespace, metadata de bloques)
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: hdfs-namenode
+  namespace: reservainteligente
+spec:
+  serviceName: hdfs-namenode
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hdfs-namenode
+  template:
+    metadata:
+      labels:
+        app: hdfs-namenode
+    spec:
+      containers:
+        - name: hdfs-namenode
+          image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+          ports:
+            - containerPort: 9000
+              name: ipc
+            - containerPort: 9870
+              name: webui
+          env:
+            - name: CLUSTER_NAME
+              value: "hive-cluster"
+            - name: HDFS_CONF_dfs_replication
+              value: "1"
+            - name: HDFS_CONF_dfs_namenode_name_dir
+              value: "file:///hadoop/dfs/name"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          volumeMounts:
+            - name: hdfs-namenode-storage
+              mountPath: /hadoop/dfs/name
+  volumeClaimTemplates:
+    - metadata:
+        name: hdfs-namenode-storage
+      spec:
+        storageClassName: ""
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 2Gi
+        volumeName: hdfs-namenode-pv

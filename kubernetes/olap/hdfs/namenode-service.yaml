@@ -1,0 +1,20 @@
+# Service del HDFS NameNode
+# ClusterIP None (headless) para StatefulSet con DNS estable
+# Puerto 9000: IPC (comunicacion interna Hadoop)
+# Puerto 9870: Web UI para monitoreo del cluster HDFS
+apiVersion: v1
+kind: Service
+metadata:
+  name: hdfs-namenode
+  namespace: reservainteligente
+spec:
+  selector:
+    app: hdfs-namenode
+  clusterIP: None
+  ports:
+    - name: ipc
+      port: 9000
+      targetPort: 9000
+    - name: webui
+      port: 9870
+      targetPort: 9870

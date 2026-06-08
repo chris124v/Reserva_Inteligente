@@ -1,0 +1,58 @@
+# Deployment de HiveServer2
+# HiveServer2 acepta conexiones JDBC/ODBC y ejecuta queries HiveQL
+# Se conecta al Metastore (puerto 9083) para obtener esquemas y a HDFS para leer datos
+#
+# Puerto 10000: JDBC (para conectar desde beeline, DBeaver, Spark, etc.)
+# Puerto 10002: Web UI (monitoreo de queries activas)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hiveserver2
+  namespace: reservainteligente
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hiveserver2
+  template:
+    metadata:
+      labels:
+        app: hiveserver2
+    spec:
+      containers:
+        - name: hiveserver2
+          image: bde2020/hive:2.3.2-postgresql-metastore
+          command:
+            - /opt/hive/bin/hive
+            - --service
+            - hiveserver2
+          ports:
+            - containerPort: 10000
+              name: jdbc
+            - containerPort: 10002
+              name: webui
+          env:
+            - name: HIVE_SITE_CONF_javax_jdo_option_ConnectionURL
+              value: "jdbc:postgresql://hive-metastore-db:5432/metastore"
+            - name: HIVE_SITE_CONF_javax_jdo_option_ConnectionDriverName
+              value: "org.postgresql.Driver"
+            - name: HIVE_SITE_CONF_javax_jdo_option_ConnectionUserName
+              value: "hive"
+            - name: HIVE_SITE_CONF_javax_jdo_option_ConnectionPassword
+              value: "hive"
+            - name: HIVE_SITE_CONF_datanucleus_autoCreateSchema
+              value: "false"
+            - name: HIVE_SITE_CONF_hive_metastore_uris
+              value: "thrift://hive-metastore:9083"
+            - name: CORE_CONF_fs_defaultFS
+              value: "hdfs://hdfs-namenode:9000"
+            # Espera a que Metastore este listo antes de iniciar
+            - name: SERVICE_PRECONDITION
+              value: "hive-metastore:9083"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"

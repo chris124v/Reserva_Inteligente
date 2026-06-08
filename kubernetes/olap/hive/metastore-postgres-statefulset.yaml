@@ -1,0 +1,67 @@
+# PersistentVolume para la BD del Hive Metastore
+# Esta es una instancia PostgreSQL separada de la BD de la API
+# Solo almacena los metadatos de tablas/schemas de Hive (no datos de negocio)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: hive-metastore-postgres-pv
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /mnt/pv/hive-metastore-postgres
+  persistentVolumeReclaimPolicy: Retain
+---
+# StatefulSet de PostgreSQL para el Hive Metastore
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: hive-metastore-db
+  namespace: reservainteligente
+spec:
+  serviceName: hive-metastore-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hive-metastore-db
+  template:
+    metadata:
+      labels:
+        app: hive-metastore-db
+    spec:
+      containers:
+        - name: hive-metastore-db
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: hive
+            - name: POSTGRES_PASSWORD
+              value: hive
+            - name: POSTGRES_DB
+              value: metastore
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "300m"
+          volumeMounts:
+            - name: hive-metastore-db-storage
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: hive-metastore-db-storage
+      spec:
+        storageClassName: ""
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+        volumeName: hive-metastore-postgres-pv

@@ -1,0 +1,74 @@
+# Deployment del Hive Metastore
+# El Metastore guarda los metadatos de tablas, columnas, particiones y schemas de Hive
+# en PostgreSQL y los expone via Thrift (puerto 9083) para que HiveServer2 los consulte
+#
+# initContainer: inicializa el schema de metastore en PostgreSQL la primera vez
+# Si el schema ya existe, schematool devuelve error y el || true lo ignora
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hive-metastore
+  namespace: reservainteligente
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hive-metastore
+  template:
+    metadata:
+      labels:
+        app: hive-metastore
+    spec:
+      initContainers:
+        - name: init-schema
+          image: bde2020/hive:2.3.2-postgresql-metastore
+          command:
+            - /bin/sh
+            - -c
+            - /opt/hive/bin/schematool -dbType postgres -initSchema || true
+          env:
+            - name: HIVE_SITE_CONF_javax_jdo_option_ConnectionURL
+              value: "jdbc:postgresql://hive-metastore-db:5432/metastore"
+            - name: HIVE_SITE_CONF_javax_jdo_option_ConnectionDriverName
+              value: "org.postgresql.Driver"
+            - name: HIVE_SITE_CONF_javax_jdo_option_ConnectionUserName
+              value: "hive"
+            - name: HIVE_SITE_CONF_javax_jdo_option_ConnectionPassword
+              value: "hive"
+            - name: CORE_CONF_fs_defaultFS
+              value: "hdfs://hdfs-namenode:9000"
+      containers:
+        - name: hive-metastore
+          image: bde2020/hive:2.3.2-postgresql-metastore
+          command:
+            - /opt/hive/bin/hive
+            - --service
+            - metastore
+          ports:
+            - containerPort: 9083
+              name: thrift
+          env:
+            - name: HIVE_SITE_CONF_javax_jdo_option_ConnectionURL
+              value: "jdbc:postgresql://hive-metastore-db:5432/metastore"
+            - name: HIVE_SITE_CONF_javax_jdo_option_ConnectionDriverName
+              value: "org.postgresql.Driver"
+            - name: HIVE_SITE_CONF_javax_jdo_option_ConnectionUserName
+              value: "hive"
+            - name: HIVE_SITE_CONF_javax_jdo_option_ConnectionPassword
+              value: "hive"
+            # autoCreateSchema=false porque el initContainer ya lo inicializo
+            - name: HIVE_SITE_CONF_datanucleus_autoCreateSchema
+              value: "false"
+            - name: HIVE_SITE_CONF_hive_metastore_uris
+              value: "thrift://hive-metastore:9083"
+            - name: CORE_CONF_fs_defaultFS
+              value: "hdfs://hdfs-namenode:9000"
+            - name: SERVICE_PRECONDITION
+              value: "hdfs-namenode:9870 hive-metastore-db:5432"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
