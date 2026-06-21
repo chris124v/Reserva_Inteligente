@@ -42,7 +42,7 @@ $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 $kubernetesPath = Split-Path -Parent $scriptPath
 Set-Location $kubernetesPath
 
-Write-Host "[1/4] Deteniendo workloads..." -ForegroundColor Yellow
+Write-Host "[1/5] Deteniendo stack operacional..." -ForegroundColor Yellow
 Stop-Workload -Kind deployment -Name main-api
 Stop-Workload -Kind deployment -Name search-service
 Stop-Workload -Kind deployment -Name nginx-balancer
@@ -52,20 +52,30 @@ Stop-Workload -Kind statefulset -Name mongors1
 Stop-Workload -Kind statefulset -Name postgres
 Stop-Workload -Kind deployment -Name redis
 Stop-Workload -Kind statefulset -Name elasticsearch
-Write-Host "OK Workloads detenidos" -ForegroundColor Green
+Write-Host "OK Stack operacional detenido" -ForegroundColor Green
 Write-Host ""
 
-Write-Host "[2/4] Limpiando job de inicializacion..." -ForegroundColor Yellow
+Write-Host "[2/5] Deteniendo Spark..." -ForegroundColor Yellow
+Stop-Workload -Kind deployment -Name spark-master
+Stop-Workload -Kind deployment -Name spark-worker
+Write-Host "OK Spark detenido" -ForegroundColor Green
+Write-Host ""
+
+Write-Host "[3/5] Deteniendo Hive y HDFS..." -ForegroundColor Yellow
+Stop-Workload -Kind deployment -Name hiveserver2
+Stop-Workload -Kind deployment -Name hive-metastore
+Stop-Workload -Kind statefulset -Name hive-metastore-db
+Stop-Workload -Kind statefulset -Name hdfs-datanode
+Stop-Workload -Kind statefulset -Name hdfs-namenode
+Write-Host "OK Hive y HDFS detenidos" -ForegroundColor Green
+Write-Host ""
+
+Write-Host "[4/5] Limpiando jobs de inicializacion..." -ForegroundColor Yellow
 kubectl delete job mongo-init -n reservainteligente --ignore-not-found=true
-Write-Host "OK Job eliminado" -ForegroundColor Green
+Write-Host "OK Jobs eliminados" -ForegroundColor Green
 Write-Host ""
 
-Write-Host "[3/4] Esperando..." -ForegroundColor Yellow
-Start-Sleep -Seconds 5
-Write-Host "OK" -ForegroundColor Green
-Write-Host ""
-
-Write-Host "[4/4] Conservando namespace y volumenes persistentes" -ForegroundColor Yellow
+Write-Host "[5/5] Conservando namespace y volumenes persistentes" -ForegroundColor Yellow
 Write-Host "OK namespace reservainteligente y PVC/PV se mantienen" -ForegroundColor Green
 Write-Host ""
 
@@ -73,5 +83,6 @@ Write-Host "=====================================" -ForegroundColor Green
 Write-Host "  Workloads detenidos!" -ForegroundColor Green
 Write-Host "=====================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "Para volver a levantar: .\deploy-all.ps1" -ForegroundColor Cyan
+Write-Host "Para volver a levantar el stack operacional: .\deploy-all.ps1" -ForegroundColor Cyan
+Write-Host "Para volver a levantar OLAP + Spark:        .\deploy-olap.ps1" -ForegroundColor Cyan
 Write-Host ""
