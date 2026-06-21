@@ -1,0 +1,19 @@
+# Service del Spark Master
+# Puerto 7077: cluster manager — workers y spark-submit se conectan aquí
+# Puerto 8080: web UI para monitorear jobs y workers
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-master
+  namespace: reservainteligente
+spec:
+  selector:
+    app: spark-master
+  ports:
+    - name: cluster
+      port: 7077
+      targetPort: 7077
+    - name: webui
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP

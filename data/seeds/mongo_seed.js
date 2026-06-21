@@ -2,10 +2,10 @@
 // Run with: mongosh --file mongo_seed.js --host <mongos-host> --port 27017
 // IMPORTANT: Run mongo_cleanup.js BEFORE this script to ensure clean state.
 //
-// NOTE: Users are managed in AWS Cognito and are not inserted by this script.
-//
 // ID mapping:
-// usuario_id 1-5: References to Cognito users (not inserted here)
+// usuario_id 1-5: inserted below (must match Cognito users)
+//   1=adminmongo (admin), 2=clientemongo (cliente), 3=admin2.mongo (admin),
+//   4=lionel.mongo (cliente), 5=iniesta.mongo (cliente)
 // restaurante_id: Auto-generated (1-7)
 // menu_id: Auto-generated (1-28)
 // reservation_id: Auto-generated (1-9)
@@ -13,6 +13,16 @@
 //
 
 db = db.getSiblingDB('reserva_inteligente');
+
+// Users (must be inserted first; admin_id=1 and admin_id=3 referenced by restaurants)
+db.users.insertMany([
+  {id:1, email:'adminmongo@gmail.com',      nombre:'Admin Mongo',        password_hash:'cognito', rol:'admin',   activo:true},
+  {id:2, email:'clientemongo@gmail.com',    nombre:'Cliente Mongo',      password_hash:'cognito', rol:'cliente', activo:true},
+  {id:3, email:'admin2.mongo@example.com',  nombre:'Zlatan Ibrahimovic', password_hash:'cognito', rol:'admin',   activo:true},
+  {id:4, email:'lionel.mongo@example.com',  nombre:'Lionel Messi',       password_hash:'cognito', rol:'cliente', activo:true},
+  {id:5, email:'iniesta.mongo@example.com', nombre:'Andres Iniesta',     password_hash:'cognito', rol:'cliente', activo:true}
+]);
+print('✓ Users inserted');
 
 // Restaurants
 db.restaurants.insertMany([

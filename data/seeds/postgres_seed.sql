@@ -1,14 +1,24 @@
 -- Minimal seed data for Postgres (restaurantes_db)
--- NOTE: Users are managed in AWS Cognito and are not inserted by this script.
 -- IMPORTANT: Run postgres_cleanup.sql BEFORE this script to ensure clean state.
 --
 -- ID mapping:
--- usuario_id 1-5: References to Cognito users (not inserted here)
+-- usuario_id 1-5: inserted below (must match Cognito users)
+--   1=adminpostgres (admin), 2=clientepostgres (cliente), 3=admin2.postgres (admin),
+--   4=lionel.postgres (cliente), 5=iniesta.postgres (cliente)
 -- restaurante_id: Auto-generated (1-7)
 -- menu_id: Auto-generated (1-28)
 -- reservation_id: Auto-generated (1-9)
 -- order_id: Auto-generated (1-12)
---
+
+-- Users (must be inserted first; admin_id=1 and admin_id=3 referenced by restaurants)
+INSERT INTO users (id, email, nombre, password_hash, rol, activo, fecha_creacion, fecha_actualizacion) VALUES
+(1, 'adminpostgres@gmail.com',   'Admin Postgres',    'cognito', 'ADMIN',   true, NOW(), NOW()),
+(2, 'clientepostgres@gmail.com', 'Cliente Postgres',  'cognito', 'CLIENTE', true, NOW(), NOW()),
+(3, 'admin2.postgres@gmail.com', 'Cristiano Ronaldo', 'cognito', 'ADMIN',   true, NOW(), NOW()),
+(4, 'lionel.postgres@gmail.com', 'Lionel Messi',      'cognito', 'CLIENTE', true, NOW(), NOW()),
+(5, 'iniesta.postgres@gmail.com','Andres Iniesta',    'cognito', 'CLIENTE', true, NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;
+
 -- Restaurants (5 owned by base admin id=1, 2 owned by admin id=3)
 INSERT INTO restaurants (id, nombre, descripcion, direccion, telefono, email, admin_id, hora_apertura, hora_cierre, total_mesas, fecha_creacion, fecha_actualizacion) VALUES
 (1, 'sapore tratoria', 'Autentica comida italiana', 'Calle Roma 123', '555-0101', 'sapore@demo.com', 1, '10:00', '22:00', 20, NOW(), NOW()),

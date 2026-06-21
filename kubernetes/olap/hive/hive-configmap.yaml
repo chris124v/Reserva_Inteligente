@@ -1,0 +1,64 @@
+# ConfigMap con la configuración de Hive y Hadoop
+# Evita depender del mecanismo de conversión de env vars de bde2020 (HIVE_SITE_CONF_*)
+# Se monta directamente en /opt/hive/conf/ en todos los contenedores de Hive
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hive-config
+  namespace: reservainteligente
+data:
+  hive-site.xml: |
+    <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+    <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+    <configuration>
+      <property>
+        <name>javax.jdo.option.ConnectionURL</name>
+        <value>jdbc:postgresql://hive-metastore-db-0.hive-metastore-db.reservainteligente.svc.cluster.local:5432/metastore</value>
+      </property>
+      <property>
+        <name>javax.jdo.option.ConnectionDriverName</name>
+        <value>org.postgresql.Driver</value>
+      </property>
+      <property>
+        <name>javax.jdo.option.ConnectionUserName</name>
+        <value>hive</value>
+      </property>
+      <property>
+        <name>javax.jdo.option.ConnectionPassword</name>
+        <value>hive</value>
+      </property>
+      <property>
+        <name>datanucleus.autoCreateSchema</name>
+        <value>false</value>
+      </property>
+      <property>
+        <name>datanucleus.fixedDatastore</name>
+        <value>true</value>
+      </property>
+      <property>
+        <name>hive.metastore.uris</name>
+        <value>thrift://hive-metastore:9083</value>
+      </property>
+      <property>
+        <name>hive.metastore.schema.verification</name>
+        <value>false</value>
+      </property>
+    </configuration>
+
+  core-site.xml: |
+    <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+    <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+    <configuration>
+      <property>
+        <name>fs.defaultFS</name>
+        <value>hdfs://hdfs-namenode-0.hdfs-namenode.reservainteligente.svc.cluster.local:8020</value>
+      </property>
+      <property>
+        <name>hadoop.proxyuser.root.hosts</name>
+        <value>*</value>
+      </property>
+      <property>
+        <name>hadoop.proxyuser.root.groups</name>
+        <value>*</value>
+      </property>
+    </configuration>

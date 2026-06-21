@@ -1,11 +1,33 @@
 # Instrucciones Seed
 
-## Flujo correcto
-1. Registra primero los usuarios en AWS Cognito.
-2. Ejecuta cleanup de Postgres.
-3. Ejecuta cleanup de Mongo.
-4. Ejecuta seed de Postgres.
-5. Ejecuta seed de Mongo.
+## Flujo correcto (todo en Kubernetes)
+
+### Si usas PostgreSQL (`DATABASE_TYPE=postgresql`)
+1. `python data/seeds/seed_users.py`  ← solo crea usuarios en Cognito
+2. Ejecuta cleanup de Postgres (sección 1).
+3. Ejecuta seed de Postgres (sección 3) ← crea usuarios + datos en la BD.
+
+### Si usas MongoDB (`DATABASE_TYPE=mongodb`)
+1. `python data/seeds/seed_users_mongo.py`  ← solo crea usuarios en Cognito
+2. Ejecuta cleanup de Mongo (sección 2).
+3. Ejecuta seed de Mongo (sección 4) ← crea usuarios + datos en la BD.
+
+---
+
+## 0. Seed de Usuarios en Cognito
+
+Ambos scripts hacen lo mismo: crear los 10 usuarios en AWS Cognito. Son idempotentes.
+
+```bash
+# Si usas PostgreSQL:
+python data/seeds/seed_users.py
+
+# Si usas MongoDB:
+python data/seeds/seed_users_mongo.py
+```
+
+> **Nota:** Los usuarios en las BDs (Postgres/Mongo) los crean `postgres_seed.sql` y
+> `mongo_seed.js` directamente. Solo se necesita correr este script una vez por entorno.
 
 ## 1. Cleanup Postgres
 ```bash

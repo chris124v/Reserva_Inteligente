@@ -219,20 +219,6 @@ Probar en Swagger del search-service
 kubectl port-forward svc/search-service 8001:80 -n reservainteligente
 ```
 
-Abrir en navegador:
-
-```text
-http://localhost:8001/docs
-```
-
-Orden recomendado para probar en Swagger:
-
-```text
-1) POST /search/reindex
-2) GET /search/menus?q=pollo
-3) GET /search/menus/category/{categoria}
-```
-
 ## 12. Nginx Load Balancer
 
 Comandos para aplicar el balanceador de Nginx
@@ -315,16 +301,44 @@ Validar pods escalados, deberia haber 3 replica por cada servicio de api
 ```
 kubectl get pods -n reservainteligente
 ```
+## 14. OLAP Logs y inicializacion
 
+Estado general
 
-
-## Orden recomendado para inicialiazar
-
-```text
-1. .\deploy-all.ps1    (desplegar todo)
-2. .\status.ps1        (verificar que esta corriendo)
-3. .\cleanup-all.ps1   (cuando termines de trabajar)
-4. .\deploy-all.ps1    (volver a desplegar si lo necesitas)
+```
+kubectl get pods -n reservainteligente -l "app in (hdfs-namenode,hdfs-datanode,hive-metastore-db,hive-metastore,hiveserver2)"
 ```
 
+Logs HDFS NameNode
 
+```
+kubectl logs -n reservainteligente hdfs-namenode-0 --tail=20
+```
+
+Logs HDFS DataNode
+
+```
+kubectl logs -n reservainteligente hdfs-datanode-0 --tail=20
+```
+
+Logs Hive Metastore
+
+```
+kubectl logs -n reservainteligente -l app=hive-metastore --tail=20
+```
+
+Logs HiveServer2
+
+```
+kubectl logs -n reservainteligente -l app=hiveserver2 --tail=20
+```
+
+Web UI HDFS (ver cluster y archivos)
+```
+kubectl port-forward -n reservainteligente svc/hdfs-namenode 9870:9870
+```
+
+Web UI HiveServer2 (ver queries activas)
+```
+kubectl port-forward -n reservainteligente svc/hiveserver2 10002:10002
+```

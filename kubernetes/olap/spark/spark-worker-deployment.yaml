@@ -1,0 +1,40 @@
+# Deployment del Spark Worker
+# El worker se registra en el master al arrancar y ejecuta las tasks de los jobs
+# SPARK_WORKER_MEMORY y SPARK_WORKER_CORES limitan los recursos que ofrece al cluster
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-worker
+  namespace: reservainteligente
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-worker
+  template:
+    metadata:
+      labels:
+        app: spark-worker
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: spark-worker
+          image: bde2020/spark-worker:3.0.0-hadoop3.2
+          env:
+            - name: SPARK_MASTER
+              value: spark://spark-master:7077
+            - name: SPARK_WORKER_MEMORY
+              value: 1g
+            - name: SPARK_WORKER_CORES
+              value: "1"
+            # fuerza python3 en los executors; sin esto el worker usa python2 y
+            # los scripts fallan con SyntaxError al encontrar f-strings o UTF-8
+            - name: PYSPARK_PYTHON
+              value: python3
+          resources:
+            requests:
+              memory: "768Mi"
+              cpu: "300m"
+            limits:
+              memory: "1536Mi"
+              cpu: "1000m"

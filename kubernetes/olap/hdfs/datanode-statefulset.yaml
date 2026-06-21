@@ -41,7 +41,7 @@ spec:
               name: data
           env:
             - name: CORE_CONF_fs_defaultFS
-              value: "hdfs://hdfs-namenode:9000"
+              value: "hdfs://hdfs-namenode:8020"
             - name: HDFS_CONF_dfs_replication
               value: "1"
             - name: HDFS_CONF_dfs_datanode_data_dir

@@ -1,0 +1,41 @@
+# Deployment del Spark Master (modo standalone)
+# El master actúa como cluster manager: acepta jobs de spark-submit
+# y distribuye tasks a los workers registrados en puerto 7077
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-master
+  namespace: reservainteligente
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-master
+  template:
+    metadata:
+      labels:
+        app: spark-master
+    spec:
+      # evita que K8s inyecte SPARK_MASTER_PORT=tcp://... como env var de service link,
+      # lo que causaría un NumberFormatException al intentar parsearla como entero
+      enableServiceLinks: false
+      containers:
+        - name: spark-master
+          image: bde2020/spark-master:3.0.0-hadoop3.2
+          env:
+            - name: INIT_DAEMON_STEP
+              value: setup_spark
+            - name: SPARK_MASTER_HOST
+              value: spark-master
+          ports:
+            - containerPort: 7077
+              name: cluster
+            - containerPort: 8080
+              name: webui
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
