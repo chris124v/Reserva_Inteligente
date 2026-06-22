@@ -10,17 +10,17 @@ if (-not (Get-Command kubectl -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-Write-Host "[1/5] Estado del cluster..." -ForegroundColor Yellow
+Write-Host "[1/7] Estado del cluster..." -ForegroundColor Yellow
 kubectl cluster-info --request-timeout=5s 2>&1 | Out-Null
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "OK Kubernetes corriendo" -ForegroundColor Green
+    Write-Host "  OK Kubernetes corriendo" -ForegroundColor Green
 } else {
-    Write-Host "X Kubernetes NO corriendo" -ForegroundColor Red
+    Write-Host "  X Kubernetes NO corriendo" -ForegroundColor Red
     exit 1
 }
 Write-Host ""
 
-Write-Host "[2/5] Verificando namespace..." -ForegroundColor Yellow
+Write-Host "[2/7] Namespace..." -ForegroundColor Yellow
 $ns = kubectl get namespace reservainteligente --ignore-not-found=true 2>$null
 if ($ns) {
     Write-Host "  OK reservainteligente existe" -ForegroundColor Green
@@ -29,36 +29,99 @@ if ($ns) {
 }
 Write-Host ""
 
-Write-Host "[3/5] Estado de los pods..." -ForegroundColor Yellow
-kubectl get pods -n reservainteligente
+# Helper: comprueba si un deployment/statefulset tiene al menos 1 pod Ready
+function Get-WorkloadStatus {
+    param([string]$Kind, [string]$Name)
+    $ready = kubectl get $Kind $Name -n reservainteligente --ignore-not-found=true -o jsonpath="{.status.readyReplicas}" 2>$null
+    if ([string]::IsNullOrWhiteSpace($ready) -or $ready -eq "0") { return "X" }
+    return "OK"
+}
+
+Write-Host "[3/7] Stack operacional..." -ForegroundColor Yellow
+$checks = @(
+    @{kind="deployment"; name="main-api";       label="API"},
+    @{kind="deployment"; name="search-service"; label="Search Service"},
+    @{kind="deployment"; name="nginx-balancer"; label="Nginx"},
+    @{kind="statefulset"; name="postgres";       label="PostgreSQL"},
+    @{kind="deployment"; name="redis";           label="Redis"},
+    @{kind="statefulset"; name="elasticsearch";  label="Elasticsearch"},
+    @{kind="statefulset"; name="mongo-configsvr";label="MongoDB Config"},
+    @{kind="statefulset"; name="mongors1";        label="MongoDB Shard"},
+    @{kind="deployment"; name="mongos";          label="MongoDB Mongos"}
+)
+foreach ($c in $checks) {
+    $status = Get-WorkloadStatus -Kind $c.kind -Name $c.name
+    if ($status -eq "OK") {
+        Write-Host "  OK $($c.label)" -ForegroundColor Green
+    } else {
+        Write-Host "  X  $($c.label)" -ForegroundColor Red
+    }
+}
 Write-Host ""
 
-Write-Host "[4/5] Servicios..." -ForegroundColor Yellow
-Write-Host "  API:           http://localhost:8000 (necesita port-forward)" -ForegroundColor White
-Write-Host "  Search docs:   http://localhost:8001/docs (port-forward a search-service)" -ForegroundColor White
-Write-Host "  Nginx:         http://localhost:8080 (port-forward a nginx-service)" -ForegroundColor White
-Write-Host "  PostgreSQL:    localhost:5432" -ForegroundColor White
-Write-Host "  Redis:         localhost:6379" -ForegroundColor White
-Write-Host "  MongoDB:       localhost:27017" -ForegroundColor White
-Write-Host "  Elasticsearch: localhost:9200 (necesita port-forward)" -ForegroundColor White
+Write-Host "[4/7] HDFS..." -ForegroundColor Yellow
+$nnStatus = Get-WorkloadStatus -Kind statefulset -Name hdfs-namenode
+$dnStatus = Get-WorkloadStatus -Kind statefulset -Name hdfs-datanode
+if ($nnStatus -eq "OK") { Write-Host "  OK NameNode (RPC :8020, UI :9870)" -ForegroundColor Green } else { Write-Host "  X  NameNode" -ForegroundColor Red }
+if ($dnStatus -eq "OK") { Write-Host "  OK DataNode" -ForegroundColor Green } else { Write-Host "  X  DataNode" -ForegroundColor Red }
 Write-Host ""
 
-Write-Host "[5/6] Persistencia..." -ForegroundColor Yellow
+Write-Host "[5/7] Hive..." -ForegroundColor Yellow
+$msdbStatus = Get-WorkloadStatus -Kind statefulset -Name hive-metastore-db
+$msStatus   = Get-WorkloadStatus -Kind deployment  -Name hive-metastore
+$hs2Status  = Get-WorkloadStatus -Kind deployment  -Name hiveserver2
+if ($msdbStatus -eq "OK") { Write-Host "  OK Metastore DB (PostgreSQL)" -ForegroundColor Green } else { Write-Host "  X  Metastore DB" -ForegroundColor Red }
+if ($msStatus   -eq "OK") { Write-Host "  OK Hive Metastore (:9083)" -ForegroundColor Green }   else { Write-Host "  X  Hive Metastore" -ForegroundColor Red }
+if ($hs2Status  -eq "OK") { Write-Host "  OK HiveServer2 (:10000 JDBC, :10002 UI)" -ForegroundColor Green } else { Write-Host "  X  HiveServer2" -ForegroundColor Red }
+
+if ($hs2Status -eq "OK") {
+    $hivePod = kubectl get pods -n reservainteligente -l app=hiveserver2 --field-selector=status.phase=Running -o jsonpath="{.items[0].metadata.name}" 2>$null
+    if (-not [string]::IsNullOrWhiteSpace($hivePod)) {
+        $tables = kubectl exec -n reservainteligente $hivePod -- /opt/hive/bin/hive -e "USE reserva_dw; SHOW TABLES;" 2>$null
+        $tableCount = ($tables -split "`n" | Where-Object { $_ -match "^\w" }).Count
+        if ($tableCount -gt 0) {
+            Write-Host "  OK reserva_dw: $tableCount tablas/vistas" -ForegroundColor Green
+        } else {
+            Write-Host "  X  reserva_dw vacia (corre deploy-olap.ps1 para inicializar)" -ForegroundColor Yellow
+        }
+    }
+}
+Write-Host ""
+
+Write-Host "[6/7] Spark..." -ForegroundColor Yellow
+$smStatus = Get-WorkloadStatus -Kind deployment -Name spark-master
+$swStatus = Get-WorkloadStatus -Kind deployment -Name spark-worker
+if ($smStatus -eq "OK") { Write-Host "  OK Spark Master (:7077 cluster, :8080 UI)" -ForegroundColor Green } else { Write-Host "  X  Spark Master" -ForegroundColor Red }
+if ($swStatus -eq "OK") { Write-Host "  OK Spark Worker" -ForegroundColor Green }                          else { Write-Host "  X  Spark Worker" -ForegroundColor Red }
+
+if ($smStatus -eq "OK") {
+    $pgPod = kubectl get pods -n reservainteligente -l app=postgres --field-selector=status.phase=Running -o jsonpath="{.items[0].metadata.name}" 2>$null
+    if (-not [string]::IsNullOrWhiteSpace($pgPod)) {
+        $analytics = kubectl exec -n reservainteligente $pgPod -- psql -U postgres -d restaurantes_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_name LIKE 'analytics_%';" 2>$null
+        $analyticsCount = ($analytics -replace '\s','')
+        if ($analyticsCount -gt 0) {
+            Write-Host "  OK $analyticsCount tablas analytics en PostgreSQL" -ForegroundColor Green
+        } else {
+            Write-Host "  - Tablas analytics no encontradas (ejecuta los scripts Spark)" -ForegroundColor DarkGray
+        }
+    }
+}
+Write-Host ""
+
+Write-Host "[7/7] Persistencia (PVC)..." -ForegroundColor Yellow
 kubectl get pvc -n reservainteligente
 Write-Host ""
-kubectl get pv
-Write-Host ""
-Write-Host "PostgreSQL:    user=postgres, pass=(revisar secret)" -ForegroundColor Gray
-Write-Host "Redis:         sin autenticacion por defecto" -ForegroundColor Gray
-Write-Host "MongoDB:       usa mongos-service dentro del cluster o localhost:27017 con port-forward" -ForegroundColor Gray
-Write-Host "Elasticsearch: se accede via localhost:9200 con port-forward" -ForegroundColor Gray
-Write-Host "Search:        se accede via localhost:8001 con port-forward a search-service" -ForegroundColor Gray
-Write-Host "Nginx:         se accede via localhost:8080 con port-forward a nginx-service" -ForegroundColor Gray
-Write-Host ""
-Write-Host "[6/6] Esquema PostgreSQL..." -ForegroundColor Yellow
-kubectl exec postgres-0 -n reservainteligente -- psql -U postgres -d restaurantes_db -c "\\dt"
-Write-Host ""
-Write-Host "Nota: el deploy crea/verifica tablas con ORM; los registros de ejemplo se cargan aparte desde los seeds." -ForegroundColor DarkGray
+
+Write-Host "=====================================" -ForegroundColor Cyan
+Write-Host "  Port-forwards disponibles:         " -ForegroundColor Cyan
+Write-Host "=====================================" -ForegroundColor Cyan
+Write-Host "  API:            kubectl port-forward svc/api-service 8000:80 -n reservainteligente" -ForegroundColor White
+Write-Host "  Search:         kubectl port-forward svc/search-service 8001:80 -n reservainteligente" -ForegroundColor White
+Write-Host "  Nginx:          kubectl port-forward svc/nginx-service 8080:80 -n reservainteligente" -ForegroundColor White
+Write-Host "  Elasticsearch:  kubectl port-forward svc/elasticsearch 9200:9200 -n reservainteligente" -ForegroundColor White
+Write-Host "  HDFS UI:        kubectl port-forward svc/hdfs-namenode 9870:9870 -n reservainteligente" -ForegroundColor White
+Write-Host "  HiveServer2 UI: kubectl port-forward svc/hiveserver2 10002:10002 -n reservainteligente" -ForegroundColor White
+Write-Host "  Spark Master UI:kubectl port-forward svc/spark-master 8080:8080 -n reservainteligente" -ForegroundColor White
 Write-Host ""
 Write-Host "Listo!" -ForegroundColor Green
 Write-Host ""

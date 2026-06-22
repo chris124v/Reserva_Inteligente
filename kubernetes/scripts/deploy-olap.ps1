@@ -127,9 +127,7 @@ if (-not (Test-Path $schemaFile)) {
     exit 1
 }
 
-$hivePod = kubectl get pods -n reservainteligente -l app=hiveserver2 `
-    --field-selector=status.phase=Running `
-    -o jsonpath='{.items[0].metadata.name}' 2>$null
+$hivePod = kubectl get pods -n reservainteligente -l app=hiveserver2 --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>$null
 
 if ([string]::IsNullOrWhiteSpace($hivePod)) {
     Write-Host "ERROR: no hay pod de hiveserver2 en Running" -ForegroundColor Red
@@ -137,11 +135,10 @@ if ([string]::IsNullOrWhiteSpace($hivePod)) {
 }
 
 Write-Host "  Copiando schema_estrella.hql al pod $hivePod..." -ForegroundColor Cyan
-kubectl cp $schemaFile "reservainteligente/${hivePod}:/tmp/schema_estrella.hql"
+Get-Content -Raw $schemaFile | kubectl exec -i -n reservainteligente $hivePod -- sh -c "cat > /tmp/schema_estrella.hql"
 
 Write-Host "  Ejecutando DDL (CREATE DATABASE + tablas + vistas)..." -ForegroundColor Cyan
-kubectl exec -n reservainteligente $hivePod -- `
-    /opt/hive/bin/hive -f /tmp/schema_estrella.hql 2>&1 | Out-Null
+kubectl exec -n reservainteligente $hivePod -- /opt/hive/bin/hive -f /tmp/schema_estrella.hql 2>&1 | Out-Null
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ADVERTENCIA: el schema pudo haber fallado parcialmente." -ForegroundColor Yellow
@@ -151,27 +148,24 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host ""
 
-# ── Seed PostgreSQL operacional ───────────────────────────────────────────────
+# Seed PostgreSQL operacional
 
 Write-Host "[6/6] Aplicando seed a PostgreSQL operacional..." -ForegroundColor Yellow
 
 $seedFile = Join-Path $projectRoot "data\seeds\postgres_seed.sql"
 if (-not (Test-Path $seedFile)) {
-    Write-Host "  ADVERTENCIA: no se encuentra $seedFile — omitiendo seed" -ForegroundColor Yellow
+    Write-Host "  ADVERTENCIA: no se encuentra el seed, omitiendo" -ForegroundColor Yellow
 } else {
-    $pgPod = kubectl get pods -n reservainteligente -l app=postgres `
-        --field-selector=status.phase=Running `
-        -o jsonpath='{.items[0].metadata.name}' 2>$null
+    $pgPod = kubectl get pods -n reservainteligente -l app=postgres --field-selector=status.phase=Running -o "jsonpath={.items[0].metadata.name}"
 
     if ([string]::IsNullOrWhiteSpace($pgPod)) {
-        Write-Host "  ADVERTENCIA: PostgreSQL no esta corriendo — omitiendo seed" -ForegroundColor Yellow
-        Write-Host "  Ejecuta deploy-all.ps1 primero para levantar el stack operacional" -ForegroundColor DarkGray
+        Write-Host "  ADVERTENCIA: PostgreSQL no esta corriendo, omitiendo seed" -ForegroundColor Yellow
+        Write-Host "  Ejecuta deploy-all.ps1 primero" -ForegroundColor DarkGray
     } else {
-        kubectl cp $seedFile "reservainteligente/${pgPod}:/tmp/postgres_seed.sql"
-        kubectl exec -n reservainteligente $pgPod -- `
-            psql -U postgres -d restaurantes_db -f /tmp/postgres_seed.sql 2>&1 | Out-Null
+        Get-Content -Raw $seedFile | kubectl exec -i -n reservainteligente $pgPod -- sh -c "cat > /tmp/postgres_seed.sql"
+        kubectl exec -n reservainteligente $pgPod -- psql -U postgres -d restaurantes_db -f /tmp/postgres_seed.sql
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "  ADVERTENCIA: seed pudo haber fallado (puede ser normal si ya hay datos)" -ForegroundColor Yellow
+            Write-Host "  ADVERTENCIA: seed puede haber fallado (normal si ya hay datos)" -ForegroundColor Yellow
         } else {
             Write-Host "  OK Seed aplicado (5 users, 7 restaurants, 28 menus, 9 reservas, 12 orders)" -ForegroundColor Green
         }

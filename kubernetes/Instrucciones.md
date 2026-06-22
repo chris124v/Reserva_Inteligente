@@ -16,14 +16,71 @@ kubectl apply -f kubernetes/config/configmap.yaml
 kubectl get configmap app-config -n reservainteligente -o jsonpath='{.data.DATABASE_TYPE}' ; Write-Host ""
 ```
 
-## 1. Desplegar (deploy-all.ps1)
+## 1. Desplegar stack operacional (deploy-all.ps1)
 
 ```powershell
 .\deploy-all.ps1
 ```
 Despliega todo: namespace, configuracion, bases de datos y API.
 
-## 2. Limpiar (cleanup-all.ps1)
+## 2. Desplegar OLAP + Spark (deploy-olap.ps1)
+
+Requiere que el stack operacional ya este corriendo (paso 1).
+
+```powershell
+.\deploy-olap.ps1
+```
+
+Despliega en orden: HDFS NameNode → HDFS DataNode → Hive (ConfigMap + Metastore DB + Metastore + HiveServer2) → Spark Master + Worker. Al terminar inicializa el esquema estrella en Hive y aplica el seed de PostgreSQL automaticamente.
+
+Ver estado de todos los pods OLAP + Spark:
+
+```powershell
+kubectl get pods -n reservainteligente -l "app in (hdfs-namenode,hdfs-datanode,hive-metastore-db,hive-metastore,hiveserver2,spark-master,spark-worker)"
+```
+
+Port-forwards utiles una vez desplegado:
+
+```powershell
+# HDFS Web UI — ver bloques y estado del cluster
+kubectl port-forward -n reservainteligente svc/hdfs-namenode 9870:9870
+# http://localhost:9870
+
+# HiveServer2 Web UI — ver queries activas
+kubectl port-forward -n reservainteligente svc/hiveserver2 10002:10002
+# http://localhost:10002
+
+# Spark Master Web UI — ver jobs y workers
+kubectl port-forward -n reservainteligente svc/spark-master 8080:8080
+# http://localhost:8080
+```
+
+Ejecutar los analisis de Spark manualmente:
+
+```powershell
+$pod = kubectl get pods -n reservainteligente -l app=spark-master -o jsonpath='{.items[0].metadata.name}'
+
+# copiar los scripts al pod
+kubectl cp ..\olap\spark\tendencias_consumo.py reservainteligente/${pod}:/tmp/
+kubectl cp ..\olap\spark\horarios_pico.py reservainteligente/${pod}:/tmp/
+kubectl cp ..\olap\spark\crecimiento_mensual.py reservainteligente/${pod}:/tmp/
+
+# ejecutar cada uno (requiere internet para descargar el driver JDBC la primera vez)
+kubectl exec -n reservainteligente $pod -- bash -c "PYSPARK_PYTHON=python3 PYSPARK_DRIVER_PYTHON=python3 /spark/bin/spark-submit --master 'local[*]' --packages org.postgresql:postgresql:42.7.1 /tmp/tendencias_consumo.py"
+kubectl exec -n reservainteligente $pod -- bash -c "PYSPARK_PYTHON=python3 PYSPARK_DRIVER_PYTHON=python3 /spark/bin/spark-submit --master 'local[*]' --packages org.postgresql:postgresql:42.7.1 /tmp/horarios_pico.py"
+kubectl exec -n reservainteligente $pod -- bash -c "PYSPARK_PYTHON=python3 PYSPARK_DRIVER_PYTHON=python3 /spark/bin/spark-submit --master 'local[*]' --packages org.postgresql:postgresql:42.7.1 /tmp/crecimiento_mensual.py"
+```
+
+Los resultados quedan en PostgreSQL: `analytics_tendencias_consumo`, `analytics_horarios_pico`, `analytics_crecimiento_mensual`.
+
+Verificar el esquema estrella en Hive:
+
+```powershell
+$hivePod = kubectl get pods -n reservainteligente -l app=hiveserver2 -o jsonpath='{.items[0].metadata.name}'
+kubectl exec -n reservainteligente $hivePod -- /opt/hive/bin/hive -e "USE reserva_dw; SHOW TABLES;"
+```
+
+## 4. Limpiar (cleanup-all.ps1)
 
 ```powershell
 
