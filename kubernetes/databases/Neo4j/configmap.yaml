@@ -1,0 +1,30 @@
+# ConfigMap con la configuracion de Neo4J
+# Se monta directamente como neo4j.conf dentro del contenedor
+# Esto evita el conflicto con las variables de entorno que Kubernetes
+# inyecta automaticamente en los pods (como SERVICE.PORT.7687.TCP.PROTO)
+# que Neo4J interpreta erroneamente como configuracion propia.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: neo4j-config
+  namespace: reservainteligente
+data:
+  neo4j.conf: |
+    # Autenticacion
+    dbms.security.auth_enabled=true
+
+    # Puertos
+    server.bolt.listen_address=0.0.0.0:7687
+    server.http.listen_address=0.0.0.0:7474
+
+    # Memoria
+    server.memory.heap.initial_size=256m
+    server.memory.heap.max_size=512m
+
+    # Desactiva validacion estricta para evitar errores con variables de entorno de Kubernetes
+    server.config.strict_validation.enabled=false
+
+    # Habilita procedimientos APOC para algoritmos de grafos y rutas
+    dbms.security.procedures.unrestricted=apoc.*
+    dbms.security.procedures.allowlist=apoc.*

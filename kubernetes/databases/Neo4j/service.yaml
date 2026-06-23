@@ -1,0 +1,24 @@
+# Service de Neo4J en Kubernetes
+# Expone dos puertos:
+#   7474 = Neo4J Browser (interfaz web para explorar el grafo visualmente)
+#   7687 = Bolt (protocolo de conexion para scripts Python y drivers)
+
+# NodePort permite acceder desde la maquina local via kubectl port-forward
+# ClusterIP permite que otros pods dentro del cluster se conecten a Neo4J
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: neo4j-service
+  namespace: reservainteligente
+spec:
+  selector:
+    app: neo4j
+  ports:
+    - name: http
+      port: 7474
+      targetPort: 7474
+    - name: bolt
+      port: 7687
+      targetPort: 7687
+  type: ClusterIP

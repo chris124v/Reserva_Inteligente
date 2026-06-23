@@ -16,3 +16,4 @@ pymongo==4.17.0 # Biblioteca para interactuar con MongoDB
 dnspython==2.8.0 #Dependencia de pymongo 
 redis==5.0.8 # Biblioteca para interactuar con Redis
 elasticsearch==8.15.1 # Biblioteca para interactuar con Elasticsearch
+neo4j==5.18.0 # Driver de Neo4J para calcular rutas de entrega optimizadas

@@ -1,0 +1,86 @@
+# StatefulSet de Neo4J para Kubernetes
+# Neo4J es la base de datos de grafos usada para modelar relaciones entre
+# usuarios, productos y pedidos, y para calcular rutas de entrega optimas.
+#
+# Se usa StatefulSet (igual que PostgreSQL) porque Neo4J tiene estado persistente.
+# La configuracion se pasa via ConfigMap montado como archivo neo4j.conf,
+# evitando conflictos con variables de entorno que Kubernetes inyecta automaticamente.
+
+# PersistentVolume para Neo4J
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: neo4j-pv
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /mnt/pv/neo4j
+  persistentVolumeReclaimPolicy: Retain
+---
+# StatefulSet de Neo4J
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: neo4j
+  namespace: reservainteligente
+spec:
+  serviceName: neo4j-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: neo4j
+  template:
+    metadata:
+      labels:
+        app: neo4j
+    spec:
+      containers:
+        - name: neo4j
+          image: neo4j:5.18-community
+          ports:
+            - containerPort: 7474
+              name: http
+            - containerPort: 7687
+              name: bolt
+          env:
+            # Solo se define la autenticacion como variable de entorno
+            # El resto de la configuracion viene del ConfigMap montado como archivo
+            - name: NEO4J_AUTH
+              value: "neo4j/Neo4jPass123!"
+            # Plugin APOC para algoritmos de grafos
+            - name: NEO4J_PLUGINS
+              value: '["apoc"]'
+          volumeMounts:
+            - name: neo4j-storage
+              mountPath: /data
+            # Monta el ConfigMap como archivo de configuracion
+            # Esto evita que Neo4J lea las variables de entorno de Kubernetes
+            - name: neo4j-config
+              mountPath: /var/lib/neo4j/conf/neo4j.conf
+              subPath: neo4j.conf
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+      volumes:
+        - name: neo4j-config
+          configMap:
+            name: neo4j-config
+  volumeClaimTemplates:
+    - metadata:
+        name: neo4j-storage
+      spec:
+        storageClassName: ""
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+        volumeName: neo4j-pv

@@ -439,7 +439,83 @@ python -m pytest tests/integration/test_api_endpoints.py tests/integration/test_
 python -m pytest --cov=app --cov-report=term tests/unit tests/integration -q
 ```
 
-## Paso 7: Seeding de la BD
+## Paso 7: Desplegar Neo4J (Análisis de Grafos y Rutas)
+
+Neo4J es la base de datos de grafos usada para modelar relaciones entre usuarios, productos y pedidos, identificar patrones de co-compra y calcular rutas de entrega óptimas.
+
+### Prerequisitos
+
+- `deploy-all.ps1` ya ejecutado (PostgreSQL con datos cargados)
+- Python 3.11
+- Helm instalado:
+
+```powershell
+winget install Helm.Helm
+# Cerrar y abrir PowerShell nuevo, luego verificar:
+helm version
+```
+
+> **Nota:** Si `helm` no se reconoce después de instalar, descargarlo manualmente desde PowerShell como administrador:
+> ```powershell
+> curl.exe -Lo helm.zip https://get.helm.sh/helm-v3.14.0-windows-amd64.zip
+> Expand-Archive -Path helm.zip -DestinationPath helm-tmp
+> Move-Item .\helm-tmp\windows-amd64\helm.exe "C:\Windows\System32\helm.exe"
+> Remove-Item helm.zip, helm-tmp -Recurse
+> ```
+
+### Desplegar con el script
+
+```powershell
+cd kubernetes\scripts
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\deploy-neo4j.ps1
+```
+
+El script hace automáticamente:
+1. Agrega el repositorio Helm oficial de Neo4J
+2. Instala Neo4J en el namespace `reservainteligente`
+3. Instala las dependencias Python (`neo4j`, `psycopg2-binary`)
+4. Carga el grafo desde PostgreSQL (`neo4j/seed_neo4j.py`)
+
+### Acceder a Neo4J Browser
+
+```powershell
+kubectl port-forward svc/neo4j 7474:7474 7687:7687 -n reservainteligente
+```
+
+Luego abrir `http://localhost:7474` con usuario `neo4j` y contraseña `Neo4jPass123!`.
+
+### Verificar que el grafo cargó correctamente
+
+Ejecutar en Neo4J Browser:
+
+```cypher
+MATCH (n) RETURN labels(n), count(n)
+```
+
+Debe mostrar: Usuario (5), Restaurante (7), Producto (28), Pedido (12), Zona (7).
+
+### Dependencias Python del módulo Neo4J
+
+```powershell
+pip install -r neo4j/requirements.txt
+```
+
+### Estructura del grafo
+
+```
+(Usuario)-[:REALIZO]->(Pedido)-[:EN]->(Restaurante)
+(Pedido)-[:CONTIENE {cantidad}]->(Producto)
+(Producto)-[:PERTENECE_A]->(Restaurante)
+(Restaurante)-[:UBICADO_EN]->(Zona)
+(Zona)-[:DISTANCIA_A {km}]->(Zona)
+```
+
+Las consultas Cypher para co-compras, usuarios influyentes y rutas mínimas se encuentran en `neo4j/queries.cypher`.
+
+---
+
+## Paso 8: Seeding de la BD
 
 Primero crear 5 usuarios.
 

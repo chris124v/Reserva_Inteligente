@@ -6,6 +6,7 @@ from .routes.restaurants import router as restaurants_router
 from .routes.menus import router as menus_router
 from .routes.reservations import router as reservations_router
 from .routes.orders import router as orders_router
+from .routes.routes import router as routes_router
 import socket
 from .config import settings
 
@@ -29,6 +30,7 @@ app.include_router(restaurants_router)
 app.include_router(menus_router)
 app.include_router(reservations_router)
 app.include_router(orders_router)
+app.include_router(routes_router)
 
 @app.get("/")
 async def root():

@@ -1,0 +1,88 @@
+{
+  "Repartidor 1": [
+    {
+      "restaurante": "sapore tratoria",
+      "zona_restaurante": "Calle Roma",
+      "ruta": [
+        {
+          "pedido_id": 5,
+          "cliente": "Lionel Messi",
+          "zona_entrega": "Plaza Central",
+          "restaurante": "sapore tratoria",
+          "zona_restaurante": "Calle Roma",
+          "total": 10.8,
+          "km_desde_anterior": 1
+        },
+        {
+          "pedido_id": 1,
+          "cliente": "Cliente Postgres",
+          "zona_entrega": "Av Gol",
+          "restaurante": "sapore tratoria",
+          "zona_restaurante": "Calle Roma",
+          "total": 23.22,
+          "km_desde_anterior": 3
+        }
+      ],
+      "km_restaurante": 4
+    },
+    {
+      "restaurante": "La Cancha Grill",
+      "zona_restaurante": "Av Gol",
+      "ruta": [
+        {
+          "pedido_id": 7,
+          "cliente": "Lionel Messi",
+          "zona_entrega": "Calle Falsa",
+          "restaurante": "La Cancha Grill",
+          "zona_restaurante": "Av Gol",
+          "total": 13.5,
+          "km_desde_anterior": 3
+        }
+      ],
+      "km_restaurante": 3
+    }
+  ],
+  "Repartidor 2": [
+    {
+      "restaurante": "hamburguesas 360",
+      "zona_restaurante": "Boulevard",
+      "ruta": [
+        {
+          "pedido_id": 3,
+          "cliente": "Cliente Postgres",
+          "zona_entrega": "Av Gol",
+          "restaurante": "hamburguesas 360",
+          "zona_restaurante": "Boulevard",
+          "total": 14.04,
+          "km_desde_anterior": 2
+        },
+        {
+          "pedido_id": 11,
+          "cliente": "Andres Iniesta",
+          "zona_entrega": "Plaza Central",
+          "restaurante": "hamburguesas 360",
+          "zona_restaurante": "Boulevard",
+          "total": 18.36,
+          "km_desde_anterior": 3
+        }
+      ],
+      "km_restaurante": 5
+    },
+    {
+      "restaurante": "villa italia",
+      "zona_restaurante": "Av Italia",
+      "ruta": [
+        {
+          "pedido_id": 9,
+          "cliente": "Andres Iniesta",
+          "zona_entrega": "Calle Falsa",
+          "restaurante": "villa italia",
+          "zona_restaurante": "Av Italia",
+          "total": 14.04,
+          "km_desde_anterior": 2
+        }
+      ],
+      "km_restaurante": 2
+    }
+  ]
+}
