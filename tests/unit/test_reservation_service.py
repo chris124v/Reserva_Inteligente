@@ -3,7 +3,7 @@ Tests esenciales para reservation_service.py.
 Se enfocan en disponibilidad, asignación de mesa y permisos.
 """
 
-from datetime import date, time
+from datetime import date, time, timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -31,7 +31,7 @@ class TestCreateReservation:
 
 		reservation = ReservationCreate(
 			restaurante_id=1,
-			fecha=date(2026, 6, 21),
+			fecha=date.today() + timedelta(days=30),
 			hora=time(19, 0),
 			cantidad_personas=4,
 			notas="Cena familiar",
@@ -49,7 +49,7 @@ class TestCreateReservation:
 
 		reservation = ReservationCreate(
 			restaurante_id=1,
-			fecha=date(2026, 6, 21),
+			fecha=date.today() + timedelta(days=30),
 			hora=time(19, 0),
 			cantidad_personas=2,
 			notas=None,
@@ -68,7 +68,7 @@ class TestCreateReservation:
 
 		reservation = ReservationCreate(
 			restaurante_id=1,
-			fecha=date(2026, 6, 21),
+			fecha=date.today() + timedelta(days=30),
 			hora=time(19, 0),
 			cantidad_personas=2,
 			notas="Ventana",
