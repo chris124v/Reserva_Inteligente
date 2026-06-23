@@ -1,0 +1,59 @@
+# Deployment de Metabase (herramienta de visualizacion / BI).
+# Lee las tablas analytics_* de PostgreSQL (materializadas desde las vistas Hive
+# por el DAG de Airflow) y sirve los 3 dashboards del Req 3.
+# Usa H2 embebida (MB_DB_FILE) montada en el PVC para persistir su config.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metabase
+  namespace: reservainteligente
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metabase
+  template:
+    metadata:
+      labels:
+        app: metabase
+    spec:
+      containers:
+        - name: metabase
+          image: metabase/metabase:v0.50.21
+          ports:
+            - containerPort: 3000
+          env:
+            # H2 embebida persistida en el PVC
+            - name: MB_DB_TYPE
+              value: h2
+            - name: MB_DB_FILE
+              value: /metabase-data/metabase.db
+          volumeMounts:
+            - name: metabase-storage
+              mountPath: /metabase-data
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "300m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          # Metabase tarda en arrancar (migra su H2); el probe evita marcarlo Ready antes de tiempo
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            failureThreshold: 6
+      volumes:
+        - name: metabase-storage
+          persistentVolumeClaim:
+            claimName: metabase-pvc

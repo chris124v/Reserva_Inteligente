@@ -207,3 +207,12 @@ Write-Host "  Continuando con el despliegue de Airflow   " -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 & (Join-Path $scriptPath "deploy-airflow.ps1")
+
+# ── Metabase ──────────────────────────────────────────────────────────────────
+# Metabase cierra la capa analitica: visualiza las tablas analytics_* que el DAG
+# de Airflow materializa desde las vistas Hive. Se invoca el script dedicado.
+Write-Host "============================================" -ForegroundColor Cyan
+Write-Host "  Continuando con el despliegue de Metabase  " -ForegroundColor Cyan
+Write-Host "============================================" -ForegroundColor Cyan
+Write-Host ""
+& (Join-Path $scriptPath "deploy-metabase.ps1")

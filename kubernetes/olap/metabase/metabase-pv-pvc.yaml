@@ -1,0 +1,30 @@
+# PersistentVolume + PVC para Metabase.
+# Metabase usa una base H2 embebida para su propia configuracion (dashboards,
+# usuarios, conexiones). El PVC la persiste entre reinicios del pod.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: metabase-pv
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /mnt/pv/metabase
+  persistentVolumeReclaimPolicy: Retain
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: metabase-pvc
+  namespace: reservainteligente
+spec:
+  storageClassName: ""
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  volumeName: metabase-pv

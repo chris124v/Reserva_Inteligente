@@ -78,6 +78,13 @@ with DAG(
         ),
     )
 
+    # Materializa las 3 vistas OLAP de Hive en tablas analytics_* de PostgreSQL
+    # para que Metabase (Req 3) las consuma de forma nativa, sin driver de Hive.
+    materializar_vistas_metabase = BashOperator(
+        task_id="materializar_vistas_metabase",
+        bash_command="python3 /opt/spark-scripts/materializar_vistas_metabase.py",
+    )
+
     verificar_cambio_catalogo = ShortCircuitOperator(
         task_id="verificar_cambio_catalogo",
         python_callable=_verificar_cambio_catalogo,
@@ -88,4 +95,4 @@ with DAG(
         python_callable=_reindexar_elasticsearch,
     )
 
-    cargar_dw_hive >> verificar_cambio_catalogo >> reindexar_elasticsearch
+    cargar_dw_hive >> materializar_vistas_metabase >> verificar_cambio_catalogo >> reindexar_elasticsearch
