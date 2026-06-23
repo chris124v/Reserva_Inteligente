@@ -1,14 +1,31 @@
--- Minimal seed data for Postgres (restaurantes_db)
+-- Seed data for Postgres (restaurantes_db)
 -- IMPORTANT: Run postgres_cleanup.sql BEFORE this script to ensure clean state.
 --
--- ID mapping:
+-- Este seed tiene dos partes:
+--   1) Datos base explicitos (ids 1..N) que NO cambian: los 5 usuarios ligados a
+--      Cognito, 7 restaurantes, 28 menus, 9 reservas y 12 pedidos originales.
+--   2) Un bloque PL/pgSQL al final que genera datos sinteticos adicionales para
+--      poblar los dashboards de Metabase y los analisis de Spark con volumen y
+--      variedad (varios meses, estados mezclados, mas zonas). Es idempotente:
+--      solo corre si aun no se ha aplicado (detecta < 30 clientes).
+--
+-- Totales tras aplicar el seed completo:
+--   usuarios:      ~39  (6 admins, 33 clientes)
+--   restaurantes:  20
+--   menus:         300  (15 por restaurante)
+--   reservaciones: ~150 repartidas en 6 meses (ene-jun 2026), reservada/cancelada
+--   pedidos:       ~200 repartidos en 6 meses, mezcla de estados y tipos de entrega
+--
+-- NOTA Cognito: los usuarios sinteticos usan password_hash 'cognito' como
+-- placeholder igual que los base, pero NO existen en el pool de Cognito, asi que
+-- son solo datos para analitica/dashboards; no pueden autenticarse via la API.
+--
+-- ID mapping (parte base, ids fijos):
 -- usuario_id 1-5: inserted below (must match Cognito users)
 --   1=adminpostgres (admin), 2=clientepostgres (cliente), 3=admin2.postgres (admin),
 --   4=lionel.postgres (cliente), 5=iniesta.postgres (cliente)
--- restaurante_id: Auto-generated (1-7)
--- menu_id: Auto-generated (1-28)
--- reservation_id: Auto-generated (1-9)
--- order_id: Auto-generated (1-12)
+-- restaurante_id: 1-7   | menu_id: 1-28 | reservation_id: 1-9 | order_id: 1-12
+-- Los ids >= esos rangos los asignan las secuencias en el bloque PL/pgSQL final.
 
 -- Users (must be inserted first; admin_id=1 and admin_id=3 referenced by restaurants)
 INSERT INTO users (id, email, nombre, password_hash, rol, activo, fecha_creacion, fecha_actualizacion) VALUES
@@ -133,3 +150,194 @@ ON CONFLICT (id) DO UPDATE SET
   direccion_entrega = EXCLUDED.direccion_entrega,
   notas = EXCLUDED.notas,
   fecha_actualizacion = EXCLUDED.fecha_actualizacion;
+
+-- ===========================================================================
+-- SEED EXTENDIDO (sintetico) para poblar dashboards Metabase + analisis Spark
+-- ---------------------------------------------------------------------------
+-- Idempotente: el bloque entero se omite si ya hay >= 30 clientes.
+-- Genera, sobre los datos base de arriba:
+--   +4 admins, +30 clientes, +13 restaurantes, menus hasta 15 por restaurante,
+--   +141 reservaciones y +188 pedidos, repartidos en 6 meses (ene-jun 2026)
+--   con mezcla realista de estados, categorias, zonas y tipos de entrega.
+-- Los valores de columnas enum por fila se insertan via format('%L', ...) para
+-- que Postgres los auto-convierta al tipo enum destino sin depender del nombre
+-- exacto del tipo (creado por SQLAlchemy, no por una migracion explicita).
+-- ===========================================================================
+DO $$
+DECLARE
+    v_admin_ids  int[];
+    v_client_ids int[];
+    v_nombres    text[] := ARRAY['Carlos','Maria','Jose','Ana','Luis','Carmen','Juan','Laura',
+                                 'Pedro','Sofia','Diego','Valentina','Andres','Camila','Miguel',
+                                 'Daniela','Jorge','Gabriela','Fernando','Paula','Ricardo','Lucia',
+                                 'Sergio','Elena','Pablo','Marta','Hugo','Sara','Ivan','Noa'];
+    v_apellidos  text[] := ARRAY['Gomez','Rodriguez','Fernandez','Lopez','Martinez','Sanchez',
+                                 'Perez','Gonzalez','Ramirez','Torres','Flores','Rivera','Vargas',
+                                 'Castillo','Romero','Herrera','Medina','Aguilar','Reyes','Cruz'];
+    v_rest_nombres text[] := ARRAY['Cafe del Parque','Mariscos La Bahia','Tacos El Rey',
+                                   'Burger Station','Sushi Zen','Pizza Forno','Asados Don Pepe',
+                                   'Wok Express','La Esquina Verde','Pasta & Vino',
+                                   'El Rincon Criollo','Mr. Pollo','Tapas Sur'];
+    v_zonas      text[] := ARRAY['Zona Norte','Zona Sur','Zona Centro','Zona Este','Zona Oeste',
+                                 'Centro Historico','Barrio Escalante','Sabana','Heredia Centro',
+                                 'Cartago Centro'];
+    v_platos     text[] := ARRAY['Especial de la Casa','Combo Familiar','Plato del Dia','Delicia',
+                                 'Clasico','Gourmet','Tradicional','Supremo','Ligero','Picante',
+                                 'Premium','Vegetariano','Infantil','Doble','Mixto'];
+    v_cats       text[] := ARRAY['principal','pasta','pizza','carne','pescado','sushi','entrada',
+                                 'acompanamiento','ensalada','postre','bebida'];
+    r          RECORD;
+    v_existing int;
+    v_to_add   int;
+    i          int;
+    v_rest     int;
+    v_client   int;
+    v_nitems   int;
+    v_items    json;
+    v_subtotal numeric;
+    v_impuesto numeric;
+    v_total    numeric;
+    v_estado   text;
+    v_tipo     text;
+    v_dir      text;
+    v_fecha    timestamp;
+    v_rnd      double precision;
+BEGIN
+    IF (SELECT COUNT(*) FROM users WHERE rol = 'CLIENTE') >= 30 THEN
+        RAISE NOTICE 'Seed extendido ya aplicado (>= 30 clientes); se omite.';
+        RETURN;
+    END IF;
+
+    -- Los INSERT explicitos con id arriba NO avanzan las secuencias; las fijamos
+    -- al maximo actual para que los inserts por secuencia no choquen con esos ids.
+    PERFORM setval(pg_get_serial_sequence('users','id'),        (SELECT MAX(id) FROM users));
+    PERFORM setval(pg_get_serial_sequence('restaurants','id'),  (SELECT MAX(id) FROM restaurants));
+    PERFORM setval(pg_get_serial_sequence('menus','id'),        (SELECT MAX(id) FROM menus));
+    PERFORM setval(pg_get_serial_sequence('reservations','id'), (SELECT MAX(id) FROM reservations));
+    PERFORM setval(pg_get_serial_sequence('orders','id'),       (SELECT MAX(id) FROM orders));
+
+    -- ---- Usuarios: +4 admins (total 6) -------------------------------------
+    INSERT INTO users (email, nombre, password_hash, rol, activo, fecha_creacion, fecha_actualizacion)
+    SELECT 'admin' || g || '.seed@demo.com',
+           'Admin Demo ' || g,
+           'cognito', 'ADMIN', true, NOW(), NOW()
+    FROM generate_series(1, 4) g;
+
+    -- ---- Usuarios: +30 clientes (total 33) ---------------------------------
+    INSERT INTO users (email, nombre, password_hash, rol, activo, fecha_creacion, fecha_actualizacion)
+    SELECT 'cliente' || g || '.seed@demo.com',
+           v_nombres[1 + (g % array_length(v_nombres, 1))] || ' ' ||
+           v_apellidos[1 + ((g * 3) % array_length(v_apellidos, 1))],
+           'cognito', 'CLIENTE', true, NOW(), NOW()
+    FROM generate_series(1, 30) g;
+
+    SELECT array_agg(id) INTO v_admin_ids  FROM users WHERE rol = 'ADMIN';
+    SELECT array_agg(id) INTO v_client_ids FROM users WHERE rol = 'CLIENTE';
+
+    -- ---- Restaurantes: +13 (total 20), repartidos entre los admins ---------
+    INSERT INTO restaurants (nombre, descripcion, direccion, telefono, email, admin_id,
+                             hora_apertura, hora_cierre, total_mesas, fecha_creacion, fecha_actualizacion)
+    SELECT v_rest_nombres[g],
+           'Restaurante de seed para dashboards',
+           v_zonas[1 + (g % array_length(v_zonas, 1))] || ', Calle ' || (10 + g),
+           '555-' || lpad((2000 + g)::text, 4, '0'),
+           'rest' || g || '.seed@demo.com',
+           v_admin_ids[1 + (g % array_length(v_admin_ids, 1))],
+           make_time(8 + (g % 4), 0, 0),
+           make_time(21 + (g % 3), 0, 0),
+           10 + (g % 20),
+           NOW(), NOW()
+    FROM generate_series(1, 13) g;
+
+    -- ---- Menus: completar hasta 15 por restaurante (viejos y nuevos) -------
+    FOR r IN SELECT id FROM restaurants ORDER BY id LOOP
+        v_existing := (SELECT COUNT(*) FROM menus WHERE restaurante_id = r.id);
+        v_to_add   := 15 - v_existing;
+        IF v_to_add > 0 THEN
+            INSERT INTO menus (nombre, descripcion, precio, disponible, restaurante_id,
+                               tiempo_preparacion, categoria, fecha_creacion, fecha_actualizacion)
+            SELECT v_platos[1 + ((v_existing + g) % array_length(v_platos, 1))] || ' ' || (v_existing + g),
+                   'Plato generado para seed',
+                   round((6 + random() * 24)::numeric, 2),
+                   true,
+                   r.id,
+                   10 + (random() * 30)::int,
+                   v_cats[1 + ((v_existing + g) % array_length(v_cats, 1))],
+                   NOW(), NOW()
+            FROM generate_series(1, v_to_add) g;
+        END IF;
+    END LOOP;
+
+    -- ---- Reservaciones: +141 (total ~150) en 6 meses ----------------------
+    FOR i IN 1..141 LOOP
+        v_client := v_client_ids[1 + floor(random() * array_length(v_client_ids, 1))::int];
+        v_rest   := 1 + floor(random() * 20)::int;
+        v_estado := CASE WHEN random() < 0.2 THEN 'cancelada' ELSE 'reservada' END;
+        EXECUTE format(
+            'INSERT INTO reservations (usuario_id, restaurante_id, fecha, hora, cantidad_personas,
+                                       estado, notas, fecha_creacion, fecha_actualizacion)
+             VALUES (%s, %s, %L, %L, %s, %L, NULL, NOW(), NOW())',
+            v_client,
+            v_rest,
+            (DATE '2026-01-01' + (floor(random() * 181))::int)::text,
+            make_time(11 + floor(random() * 10)::int, (ARRAY[0,15,30,45])[1 + floor(random() * 4)::int], 0)::text,
+            1 + floor(random() * 8)::int,
+            v_estado
+        );
+    END LOOP;
+
+    -- ---- Pedidos: +188 (total ~200) en 6 meses ----------------------------
+    FOR i IN 1..188 LOOP
+        v_rest   := 1 + floor(random() * 20)::int;
+        v_client := v_client_ids[1 + floor(random() * array_length(v_client_ids, 1))::int];
+        v_nitems := 1 + floor(random() * 3)::int;   -- 1..3 items por pedido
+
+        SELECT json_agg(json_build_object('menu_id', sub.id, 'cantidad', sub.cantidad)),
+               COALESCE(SUM(sub.precio * sub.cantidad), 0)
+        INTO v_items, v_subtotal
+        FROM (
+            SELECT id, precio, (1 + floor(random() * 3)::int) AS cantidad
+            FROM menus
+            WHERE restaurante_id = v_rest AND disponible = true
+            ORDER BY random()
+            LIMIT v_nitems
+        ) sub;
+
+        v_subtotal := round(v_subtotal, 2);
+        v_impuesto := round(v_subtotal * 0.08, 2);
+        v_total    := round(v_subtotal + v_impuesto, 2);
+
+        v_rnd := random();
+        v_estado := CASE
+            WHEN v_rnd < 0.60 THEN 'ENTREGADO'
+            WHEN v_rnd < 0.75 THEN 'CANCELADO'
+            WHEN v_rnd < 0.85 THEN 'PENDIENTE'
+            WHEN v_rnd < 0.92 THEN 'CONFIRMADO'
+            WHEN v_rnd < 0.97 THEN 'EN_PREPARACION'
+            ELSE 'LISTO'
+        END;
+        v_tipo := (ARRAY['DOMICILIO','RECOGIDA','EN_RESTAURANTE'])[1 + floor(random() * 3)::int];
+        v_dir  := CASE WHEN v_tipo = 'DOMICILIO' THEN 'Calle Cliente ' || v_client ELSE NULL END;
+        v_fecha := TIMESTAMP '2026-01-01 00:00:00'
+                   + make_interval(days  => floor(random() * 181)::int,
+                                   hours => (10 + floor(random() * 13))::int,
+                                   mins  => floor(random() * 60)::int);
+
+        EXECUTE format(
+            'INSERT INTO orders (usuario_id, restaurante_id, items, subtotal, impuesto, total,
+                                 estado, tipo_entrega, direccion_entrega, notas,
+                                 fecha_creacion, fecha_actualizacion)
+             VALUES (%s, %s, %L, %s, %s, %s, %L, %L, %L, %L, %L, %L)',
+            v_client, v_rest, v_items::text, v_subtotal, v_impuesto, v_total,
+            v_estado, v_tipo, v_dir, '', v_fecha::text, v_fecha::text
+        );
+    END LOOP;
+
+    RAISE NOTICE 'Seed extendido aplicado: % admins, % clientes, % restaurantes, % menus, % reservas, % pedidos.',
+        (SELECT COUNT(*) FROM users WHERE rol = 'ADMIN'),
+        (SELECT COUNT(*) FROM users WHERE rol = 'CLIENTE'),
+        (SELECT COUNT(*) FROM restaurants),
+        (SELECT COUNT(*) FROM menus),
+        (SELECT COUNT(*) FROM reservations),
+        (SELECT COUNT(*) FROM orders);
+END $$;

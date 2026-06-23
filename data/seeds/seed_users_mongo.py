@@ -15,6 +15,24 @@ from app.auth.cognito import CognitoClient
 
 # ── User definitions ─────────────────────────────────────────────────────────
 
+def _seed_demo_users():
+    """Usuarios sinteticos compartidos por Postgres y Mongo.
+
+    Usan los MISMOS emails que generan postgres_seed.sql y mongo_seed.js
+    (admin{N}.seed@demo.com / cliente{N}.seed@demo.com), de modo que un solo
+    usuario de Cognito sirve a ambos backends operacionales. Son datos para
+    poblar dashboards/analitica; el password cumple la politica del pool.
+    Para borrarlos: data/seeds/cognito_cleanup.py (borra solo *.seed@demo.com).
+    """
+    users = []
+    for g in range(1, 5):       # 4 admins  -> total 6 con los base
+        users.append({"email": f"admin{g}.seed@demo.com", "password": "SeedDemo2026!",
+                      "nombre": f"Admin Demo {g}", "rol": "admin"})
+    for g in range(1, 31):      # 30 clientes -> total 33 con los base
+        users.append({"email": f"cliente{g}.seed@demo.com", "password": "SeedDemo2026!",
+                      "nombre": f"Cliente Demo {g}", "rol": "cliente"})
+    return users
+
 ALL_COGNITO_USERS = [
     {"email": "adminmongo@gmail.com",      "password": "messiGo7te!d", "nombre": "Admin Mongo",        "rol": "admin"},
     {"email": "clientemongo@gmail.com",    "password": "t0puriA!$",    "nombre": "Cliente Mongo",      "rol": "cliente"},
@@ -26,7 +44,7 @@ ALL_COGNITO_USERS = [
     {"email": "admin2.postgres@gmail.com", "password": "CR7secure!",   "nombre": "Cristiano Ronaldo",  "rol": "admin"},
     {"email": "lionel.postgres@gmail.com", "password": "t0puriA!$",    "nombre": "Lionel Messi",       "rol": "cliente"},
     {"email": "iniesta.postgres@gmail.com","password": "t0puriA!$",    "nombre": "Andres Iniesta",     "rol": "cliente"},
-]
+] + _seed_demo_users()
 
 # ── Steps ────────────────────────────────────────────────────────────────────
 

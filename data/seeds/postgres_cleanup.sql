@@ -1,6 +1,10 @@
 -- Cleanup script for Postgres: remove all seedable data and reset IDs
 -- Safe for partial persisted data: leaves tables empty and identity counters reset.
 -- Run BEFORE loading postgres_seed.sql
+--
+-- El TRUNCATE ... RESTART IDENTITY CASCADE de abajo borra TODO (base + seed
+-- extendido sintetico), sin importar el volumen. Para borrar los usuarios
+-- sinteticos de Cognito (*.seed@demo.com) usa: data/seeds/cognito_cleanup.py
 
 DO $$
 BEGIN

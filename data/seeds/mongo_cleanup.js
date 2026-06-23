@@ -1,5 +1,9 @@
 // MongoDB cleanup script for reserva_inteligente
 // Run BEFORE loading mongo_seed.js with: mongosh --file mongo_cleanup.js
+//
+// Hace drop() de todas las colecciones, asi que borra TODO (base + seed
+// extendido sintetico). Para borrar los usuarios sinteticos de Cognito
+// (*.seed@demo.com) usa: data/seeds/cognito_cleanup.py
 
 db = db.getSiblingDB('reserva_inteligente');
 
