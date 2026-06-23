@@ -585,6 +585,32 @@ kubectl exec -n reservainteligente $pgPod -- psql -U postgres -d restaurantes_db
 kubectl exec -n reservainteligente $schedPod -- airflow dags trigger etl_reserva_dw
 ```
 
+Actualizar la imagen de Airflow despues de un commit (jalar el `:latest` nuevo de GHCR)
+
+> IMPORTANTE: en este cluster de un solo nodo NO uses `kubectl rollout restart`
+> para Airflow. El rolling update intenta levantar el pod nuevo antes de matar el
+> viejo y el scheduler pide ~1Gi, asi que el pod nuevo se queda en `Pending`
+> (`Insufficient memory`) y el rollout se traba. Hay que escalar a 0 primero para
+> liberar memoria y luego volver a 1 (esto causa un breve downtime de Airflow, es
+> aceptable). `imagePullPolicy: Always` + tag `:latest` hace que el pod nuevo jale
+> la imagen recien publicada.
+
+```powershell
+# 1) bajar a 0 (libera memoria del nodo)
+kubectl scale deployment/airflow-scheduler deployment/airflow-webserver --replicas=0 -n reservainteligente
+# esperar a que no queden pods de airflow-scheduler/webserver
+kubectl get pods -n reservainteligente -l "app in (airflow-scheduler,airflow-webserver)"
+
+# 2) volver a 1 (crea pods nuevos que jalan el :latest nuevo; tarda ~3 min en jalar la imagen)
+kubectl scale deployment/airflow-scheduler deployment/airflow-webserver --replicas=1 -n reservainteligente
+kubectl rollout status deployment/airflow-scheduler -n reservainteligente --timeout=300s
+
+# 3) verificar que el pod corre la imagen nueva y el DAG tiene las 4 tasks
+$schedPod = kubectl get pods -n reservainteligente -l app=airflow-scheduler -o jsonpath='{.items[0].metadata.name}'
+kubectl get pod $schedPod -n reservainteligente -o jsonpath='{.status.containerStatuses[*].imageID}'; Write-Host ""
+kubectl exec -n reservainteligente $schedPod -- airflow tasks list etl_reserva_dw
+```
+
 ---
 
 ## 20. Metabase

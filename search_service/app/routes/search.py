@@ -25,10 +25,14 @@ def buscar_menus_por_categoria(categoria: str):
 
 @router.post("/reindex")
 def reindexar_menus():
-    # Obtiene menus desde la API principal y llama a la función que reindexa
-    url = f"{API_SERVICE_URL}/menus"
+    # Obtiene menus desde la API principal y llama a la función que reindexa.
+    # Slash final: la ruta real es /menus/ (router con prefix=/menus + ruta "/").
+    # Sin el slash, FastAPI responde 307 a /menus/; httpx no sigue redirects por
+    # defecto, asi que resp.json() fallaba sobre el body vacio del redirect y el
+    # reindex fallaba en silencio. follow_redirects=True es defensa adicional.
+    url = f"{API_SERVICE_URL}/menus/"
     try:
-        with httpx.Client(timeout=30.0) as client:
+        with httpx.Client(timeout=30.0, follow_redirects=True) as client:
             resp = client.get(url)
             resp.raise_for_status()
             menus = resp.json()

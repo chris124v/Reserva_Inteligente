@@ -28,8 +28,9 @@ htmlcov/
 # Docker
 docker-compose.override.yml
 
-# Kubernetes secrets
+# Kubernetes secrets (los valores reales viven solo local; usar los *example*.yaml como plantilla)
 kubernetes/config/secret.yaml
+kubernetes/olap/airflow/airflow-secret.yaml
 
 # Python
 dist/

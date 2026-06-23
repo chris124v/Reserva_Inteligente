@@ -133,7 +133,7 @@ def test_create_reservation_passes_correct_payload_to_dao():
 
 	reservation = ReservationCreate(
 		restaurante_id=7,
-		fecha=date(2026, 8, 1),
+		fecha=date.today() + timedelta(days=30),
 		hora=time(20, 0),
 		cantidad_personas=3,
 		notas="Test payload",

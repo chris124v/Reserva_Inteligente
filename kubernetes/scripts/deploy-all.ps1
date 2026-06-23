@@ -94,14 +94,18 @@ kubectl rollout restart deployment/nginx-balancer -n reservainteligente
 kubectl wait --for=condition=ready pod -l app=nginx-balancer -n reservainteligente --timeout=180s 2>$null
 
 Write-Host "  Inicializando esquema PostgreSQL (ORM create_all)..." -ForegroundColor Cyan
-$apiPod = kubectl get pods -n reservainteligente -l app=main-api --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>$null
-
-if ([string]::IsNullOrWhiteSpace($apiPod)) {
-    Write-Host "ERROR: no se encontro pod de main-api en estado Running para inicializar BD" -ForegroundColor Red
+# Esperar a que el rollout termine: asi solo quedan pods de la ReplicaSet nueva.
+# Antes se capturaba "el primer pod Running" justo tras el restart, lo que a veces
+# agarraba un pod viejo en terminacion y el exec fallaba con 'pods not found'.
+kubectl rollout status deployment/main-api -n reservainteligente --timeout=300s
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: el rollout de main-api no termino a tiempo" -ForegroundColor Red
     exit 1
 }
 
-kubectl exec -n reservainteligente $apiPod -c main-api -- python -m app.database.init_db
+# Ejecutar contra el deployment: kubectl resuelve a un pod listo de la RS actual,
+# sin guardar un nombre de pod que pueda desaparecer entre la consulta y el exec.
+kubectl exec -n reservainteligente deployment/main-api -c main-api -- python -m app.database.init_db
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: fallo la inicializacion del esquema PostgreSQL" -ForegroundColor Red
     exit 1
