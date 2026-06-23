@@ -197,3 +197,13 @@ Write-Host "  `$pod = kubectl get pods -n reservainteligente -l app=spark-master
 Write-Host "  kubectl cp olap/spark/tendencias_consumo.py reservainteligente/`$pod:/tmp/" -ForegroundColor DarkGray
 Write-Host "  kubectl exec -n reservainteligente `$pod -- bash -c 'PYSPARK_PYTHON=python3 PYSPARK_DRIVER_PYTHON=python3 /spark/bin/spark-submit --master local[*] --packages org.postgresql:postgresql:42.7.1 /tmp/tendencias_consumo.py'" -ForegroundColor DarkGray
 Write-Host ""
+
+# ── Airflow ───────────────────────────────────────────────────────────────────
+# Airflow se despliega como parte del stack analitico porque su DAG depende de
+# que Hive/Spark esten arriba. Se invoca el script dedicado en lugar de duplicar
+# su logica aqui, asi sigue pudiendose correr por separado con .\deploy-airflow.ps1
+Write-Host "============================================" -ForegroundColor Cyan
+Write-Host "  Continuando con el despliegue de Airflow   " -ForegroundColor Cyan
+Write-Host "============================================" -ForegroundColor Cyan
+Write-Host ""
+& (Join-Path $scriptPath "deploy-airflow.ps1")

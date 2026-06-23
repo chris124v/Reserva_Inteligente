@@ -61,7 +61,7 @@ Stop-Workload -Kind deployment -Name spark-worker
 Write-Host "OK Spark detenido" -ForegroundColor Green
 Write-Host ""
 
-Write-Host "[3/5] Deteniendo Hive y HDFS..." -ForegroundColor Yellow
+Write-Host "[3/6] Deteniendo Hive y HDFS..." -ForegroundColor Yellow
 Stop-Workload -Kind deployment -Name hiveserver2
 Stop-Workload -Kind deployment -Name hive-metastore
 Stop-Workload -Kind statefulset -Name hive-metastore-db
@@ -70,12 +70,20 @@ Stop-Workload -Kind statefulset -Name hdfs-namenode
 Write-Host "OK Hive y HDFS detenidos" -ForegroundColor Green
 Write-Host ""
 
-Write-Host "[4/5] Limpiando jobs de inicializacion..." -ForegroundColor Yellow
+Write-Host "[4/6] Deteniendo Airflow..." -ForegroundColor Yellow
+Stop-Workload -Kind deployment -Name airflow-webserver
+Stop-Workload -Kind deployment -Name airflow-scheduler
+Stop-Workload -Kind statefulset -Name airflow-postgres
+Write-Host "OK Airflow detenido" -ForegroundColor Green
+Write-Host ""
+
+Write-Host "[5/6] Limpiando jobs de inicializacion..." -ForegroundColor Yellow
 kubectl delete job mongo-init -n reservainteligente --ignore-not-found=true
+kubectl delete job airflow-init -n reservainteligente --ignore-not-found=true
 Write-Host "OK Jobs eliminados" -ForegroundColor Green
 Write-Host ""
 
-Write-Host "[5/5] Conservando namespace y volumenes persistentes" -ForegroundColor Yellow
+Write-Host "[6/6] Conservando namespace y volumenes persistentes" -ForegroundColor Yellow
 Write-Host "OK namespace reservainteligente y PVC/PV se mantienen" -ForegroundColor Green
 Write-Host ""
 
