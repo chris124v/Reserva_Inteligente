@@ -15,6 +15,7 @@ Nota: cambiar entre bds asi
 kubectl apply -f kubernetes/config/configmap.yaml
 kubectl get configmap app-config -n reservainteligente -o jsonpath='{.data.DATABASE_TYPE}' ; Write-Host ""
 ```
+---
 
 ## 1. Desplegar stack operacional (deploy-all.ps1)
 
@@ -23,7 +24,9 @@ kubectl get configmap app-config -n reservainteligente -o jsonpath='{.data.DATAB
 ```
 Despliega todo: namespace, configuracion, bases de datos y API.
 
-## 2. Desplegar OLAP + Spark (deploy-olap.ps1)
+---
+
+## 2. Desplegar OLAP + Spark + Airflow + Metabase (deploy-olap.ps1)
 
 Requiere que el stack operacional ya este corriendo (paso 1).
 
@@ -31,65 +34,26 @@ Requiere que el stack operacional ya este corriendo (paso 1).
 .\deploy-olap.ps1
 ```
 
-Despliega en orden: HDFS NameNode → HDFS DataNode → Hive (ConfigMap + Metastore DB + Metastore + HiveServer2) → Spark Master + Worker. Al terminar inicializa el esquema estrella en Hive y aplica el seed de PostgreSQL automaticamente.
+Despliega en orden:
 
-Ver estado de todos los pods OLAP + Spark:
+1. HDFS NameNode
+2. HDFS DataNode
+3. Hive (ConfigMap + Metastore DB + Metastore + HiveServer2)
+4. Spark Master + Worker
+5. Inicializa el esquema estrella en Hive (`schema_estrella.hql`) y aplica el seed de PostgreSQL
+6. Airflow (invoca `deploy-airflow.ps1`): ConfigMap/Secret → Airflow Postgres → init job (db migrate + usuario admin) → Scheduler → Webserver
+7. Metabase (invoca `deploy-metabase.ps1`): PV/PVC → Deployment → Service
 
-```powershell
-kubectl get pods -n reservainteligente -l "app in (hdfs-namenode,hdfs-datanode,hive-metastore-db,hive-metastore,hiveserver2,spark-master,spark-worker)"
-```
-
-Port-forwards utiles una vez desplegado:
-
-```powershell
-# HDFS Web UI — ver bloques y estado del cluster
-kubectl port-forward -n reservainteligente svc/hdfs-namenode 9870:9870
-# http://localhost:9870
-
-# HiveServer2 Web UI — ver queries activas
-kubectl port-forward -n reservainteligente svc/hiveserver2 10002:10002
-# http://localhost:10002
-
-# Spark Master Web UI — ver jobs y workers
-kubectl port-forward -n reservainteligente svc/spark-master 8080:8080
-# http://localhost:8080
-```
-
-Ejecutar los analisis de Spark manualmente:
+Tambien se puede correr cada capa por separado:
 
 ```powershell
-$pod = kubectl get pods -n reservainteligente -l app=spark-master -o jsonpath='{.items[0].metadata.name}'
-
-# copiar los scripts al pod
-kubectl cp ..\olap\spark\tendencias_consumo.py reservainteligente/${pod}:/tmp/
-kubectl cp ..\olap\spark\horarios_pico.py reservainteligente/${pod}:/tmp/
-kubectl cp ..\olap\spark\crecimiento_mensual.py reservainteligente/${pod}:/tmp/
-
-# ejecutar cada uno (requiere internet para descargar el driver JDBC la primera vez)
-kubectl exec -n reservainteligente $pod -- bash -c "PYSPARK_PYTHON=python3 PYSPARK_DRIVER_PYTHON=python3 /spark/bin/spark-submit --master 'local[*]' --packages org.postgresql:postgresql:42.7.1 /tmp/tendencias_consumo.py"
-kubectl exec -n reservainteligente $pod -- bash -c "PYSPARK_PYTHON=python3 PYSPARK_DRIVER_PYTHON=python3 /spark/bin/spark-submit --master 'local[*]' --packages org.postgresql:postgresql:42.7.1 /tmp/horarios_pico.py"
-kubectl exec -n reservainteligente $pod -- bash -c "PYSPARK_PYTHON=python3 PYSPARK_DRIVER_PYTHON=python3 /spark/bin/spark-submit --master 'local[*]' --packages org.postgresql:postgresql:42.7.1 /tmp/crecimiento_mensual.py"
+.\deploy-airflow.ps1
+.\deploy-metabase.ps1
 ```
 
-Los resultados quedan en PostgreSQL: `analytics_tendencias_consumo`, `analytics_horarios_pico`, `analytics_crecimiento_mensual`.
+Detalle de verificacion, logs y port-forwards de cada componente en las secciones 15 a 20 de este documento.
 
-Verificar el esquema estrella en Hive:
-
-```powershell
-$hivePod = kubectl get pods -n reservainteligente -l app=hiveserver2 -o jsonpath='{.items[0].metadata.name}'
-kubectl exec -n reservainteligente $hivePod -- /opt/hive/bin/hive -e "USE reserva_dw; SHOW TABLES;"
-```
-
-## 4. Limpiar (cleanup-all.ps1)
-
-```powershell
-
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
-powershell -ExecutionPolicy Bypass -File .\cleanup-all.ps1
-
-.\cleanup-all.ps1
-```
-Elimina todos los recursos. Pide confirmacion antes por si las dudas. Ese primer execution policy es por si no funciona con un solo comando.
+---
 
 ## 3. Estado (status.ps1)
 
@@ -98,7 +62,24 @@ Elimina todos los recursos. Pide confirmacion antes por si las dudas. Ese primer
 ```
 Verifica el estado del ambiente completo.
 
-## 4. Ver datos del Sistema
+---
+
+## 4. Limpiar (cleanup-all.ps1)
+
+
+Elimina todos los recursos. Pide confirmacion antes por si las dudas. Ese primer execution policy es por si no funciona con un solo comando.
+
+```powershell
+
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
+powershell -ExecutionPolicy Bypass -File .\cleanup-all.ps1
+
+.\cleanup-all.ps1
+```
+
+---
+
+## 5. Ver datos del Sistema
 
 Aqui vemos pods, services y pvcs
 
@@ -109,7 +90,9 @@ kubectl get pvc -n reservainteligente
 kubectl get all -n reservainteligente
 ```
 
-## 5. Ver logs para debug
+---
+
+## 6. Ver logs para debug
 
 Tanto para todos como para un pod especifico
 
@@ -119,7 +102,10 @@ kubectl logs <nombre-pod> -n reservainteligente
 kubectl describe pod <nombre-pod> -n reservainteligente
 kubectl describe deployment main-api -n reservainteligente
 ```
-## 6. API
+
+---
+
+## 7. API
 
 Algunos comando importantes para el despliegue de la api
 
@@ -128,7 +114,10 @@ kubectl rollout restart deployment/main-api -n reservainteligente #Reiniciar la 
 kubectl port-forward svc/api-service 8000:80 -n reservainteligente #Forward local de la api
 kubectl logs -f -l app=main-api -n reservainteligente #Ver logs
 ```
-## 7. Mongo
+
+---
+
+## 8. Mongo
 
 Como entramos a mongo y comandos basicos
 
@@ -146,7 +135,10 @@ db.restaurants.find().pretty()
 db.restaurants.countDocuments()
 rs.status()  # Ver estado del replica set
 ```
-## 8. Postgres
+
+---
+
+## 9. Postgres
 
 Como entramos a postgres y comandos basicos
 
@@ -165,7 +157,9 @@ kubectl exec -it postgres-0 -n reservainteligente -- psql -U postgres -d restaur
 SELECT * FROM restaurants;
 ```
 
-## 9. Aplicar cambios a configs
+---
+
+## 10. Aplicar cambios a configs
 
 Luego se puede aplicar a archivos directos pero esto es la base
 
@@ -180,7 +174,9 @@ kubectl delete -f kubernetes/
 kubectl delete pod <nombre> -n reservainteligente
 ```
 
-## 10. Redis
+---
+
+## 11. Redis
 
 Aqui voy a dejar algunos comandos importantes para interactuar con redis y el resto
 
@@ -218,7 +214,9 @@ Logs, aqui vemos si hizo hit o miss con el endpoint
 kubectl logs deployment/main-api -n reservainteligente --tail=100
 ```
 
-## 10. Elastic Search Comandos
+--=
+
+## 11. Elastic Search Comandos
 
 Aplicar cambios a los archivos de config
 
@@ -244,7 +242,9 @@ kubectl port-forward svc/search-service 8001:80 -n reservainteligente
 curl http://localhost:9200
 ```
 
-## 11. Search Service (Microservicio)
+---
+
+## 12. Search Service (Microservicio)
 
 Construir imagen local del microservicio de busqueda
 
@@ -276,7 +276,9 @@ Probar en Swagger del search-service
 kubectl port-forward svc/search-service 8001:80 -n reservainteligente
 ```
 
-## 12. Nginx Load Balancer
+---
+
+## 13. Nginx Load Balancer
 
 Comandos para aplicar el balanceador de Nginx
 
@@ -313,7 +315,9 @@ Luego abres:
 http://localhost:8001/docs
 ```
 
-## 13. Escalabilidad con KS
+---
+
+## 14. Escalabilidad con KS
 
 Para probar desde NGINX, faltaria con search porque no esta mapeado en config map 
 
@@ -358,44 +362,272 @@ Validar pods escalados, deberia haber 3 replica por cada servicio de api
 ```
 kubectl get pods -n reservainteligente
 ```
-## 14. OLAP Logs y inicializacion
 
-Estado general
+---
 
+
+## 15. OLAP (vision general)
+
+Estado de todos los pods de la capa analitica (OLAP + Spark + Airflow + Metabase)
+
+```powershell
+kubectl get pods -n reservainteligente -l "app in (hdfs-namenode,hdfs-datanode,hive-metastore-db,hive-metastore,hiveserver2,spark-master,spark-worker,airflow-postgres,airflow-scheduler,airflow-webserver,metabase)"
 ```
-kubectl get pods -n reservainteligente -l "app in (hdfs-namenode,hdfs-datanode,hive-metastore-db,hive-metastore,hiveserver2)"
+
+Script de estado completo (incluye las 9 capas: cluster, namespace, operacional, HDFS, Hive, Spark, Airflow, Metabase, PVC)
+
+```powershell
+.\status.ps1
+```
+
+Volver a desplegar toda la capa OLAP desde cero
+
+```powershell
+.\deploy-olap.ps1
+```
+
+Detener solo la capa OLAP sin tocar el stack operacional (usa cleanup-all.ps1 y luego vuelves a levantar solo el paso 1)
+
+```powershell
+.\cleanup-all.ps1
+```
+
+---
+
+## 16. Hive
+
+Estado de los pods de Hive
+
+```powershell
+kubectl get pods -n reservainteligente -l "app in (hive-metastore-db,hive-metastore,hiveserver2)"
+```
+
+Logs Hive Metastore
+
+```powershell
+kubectl logs -n reservainteligente -l app=hive-metastore --tail=20
+kubectl logs -n reservainteligente -l app=hive-metastore -c init-schema --tail=20
+```
+
+Logs HiveServer2
+
+```powershell
+kubectl logs -n reservainteligente -l app=hiveserver2 --tail=20
+```
+
+Verificar el esquema estrella (base de datos `reserva_dw`, tablas y vistas)
+
+```powershell
+$hivePod = kubectl get pods -n reservainteligente -l app=hiveserver2 -o jsonpath='{.items[0].metadata.name}'
+kubectl exec -n reservainteligente $hivePod -- /opt/hive/bin/hive -e "USE reserva_dw; SHOW TABLES;"
+kubectl exec -n reservainteligente $hivePod -- /opt/hive/bin/hive -e "USE reserva_dw; SELECT COUNT(*) FROM fact_reservas;"
+kubectl exec -n reservainteligente $hivePod -- /opt/hive/bin/hive -e "USE reserva_dw; SELECT COUNT(*) FROM fact_pedidos;"
+```
+
+Re-aplicar el DDL manualmente si hace falta
+
+```powershell
+kubectl exec -i -n reservainteligente $hivePod -- sh -c "cat > /tmp/schema_estrella.hql" < ..\olap\hive\schema_estrella.hql
+kubectl exec -n reservainteligente $hivePod -- /opt/hive/bin/hive -f /tmp/schema_estrella.hql
+```
+
+Web UI HiveServer2 (ver queries activas)
+
+```powershell
+kubectl port-forward -n reservainteligente svc/hiveserver2 10002:10002
+# http://localhost:10002
+```
+
+JDBC (por si se quiere conectar un cliente externo, ej. DBeaver)
+
+```powershell
+kubectl port-forward -n reservainteligente svc/hiveserver2 10000:10000
+# jdbc:hive2://localhost:10000
+```
+
+---
+
+## 17. HDFS
+
+Estado de los pods de HDFS
+
+```powershell
+kubectl get pods -n reservainteligente -l "app in (hdfs-namenode,hdfs-datanode)"
 ```
 
 Logs HDFS NameNode
 
-```
+```powershell
 kubectl logs -n reservainteligente hdfs-namenode-0 --tail=20
 ```
 
 Logs HDFS DataNode
 
-```
+```powershell
 kubectl logs -n reservainteligente hdfs-datanode-0 --tail=20
 ```
 
-Logs Hive Metastore
+Ver el estado del filesystem y datanodes registrados
 
-```
-kubectl logs -n reservainteligente -l app=hive-metastore --tail=20
-```
-
-Logs HiveServer2
-
-```
-kubectl logs -n reservainteligente -l app=hiveserver2 --tail=20
+```powershell
+kubectl exec -n reservainteligente hdfs-namenode-0 -- hdfs dfsadmin -report
+kubectl exec -n reservainteligente hdfs-namenode-0 -- hdfs dfs -ls /
 ```
 
-Web UI HDFS (ver cluster y archivos)
-```
+Web UI HDFS (ver cluster, bloques y archivos)
+
+```powershell
 kubectl port-forward -n reservainteligente svc/hdfs-namenode 9870:9870
+# http://localhost:9870
 ```
 
-Web UI HiveServer2 (ver queries activas)
+---
+
+## 18. Spark
+
+Estado de los pods de Spark
+
+```powershell
+kubectl get pods -n reservainteligente -l "app in (spark-master,spark-worker)"
 ```
-kubectl port-forward -n reservainteligente svc/hiveserver2 10002:10002
+
+Logs
+
+```powershell
+kubectl logs -n reservainteligente -l app=spark-master --tail=20
+kubectl logs -n reservainteligente -l app=spark-worker --tail=20
 ```
+
+Web UI Spark Master (ver jobs y workers)
+
+```powershell
+kubectl port-forward -n reservainteligente svc/spark-master 8080:8080
+# http://localhost:8080
+```
+
+Ejecutar los analisis de Spark manualmente (no es necesario si ya corre el DAG de Airflow, que los ejecuta dentro del propio contenedor de Airflow)
+
+```powershell
+$pod = kubectl get pods -n reservainteligente -l app=spark-master -o jsonpath='{.items[0].metadata.name}'
+
+kubectl cp ..\olap\spark\tendencias_consumo.py reservainteligente/${pod}:/tmp/
+kubectl cp ..\olap\spark\horarios_pico.py reservainteligente/${pod}:/tmp/
+kubectl cp ..\olap\spark\crecimiento_mensual.py reservainteligente/${pod}:/tmp/
+kubectl cp ..\olap\spark\etl_dimensiones_hechos.py reservainteligente/${pod}:/tmp/
+kubectl cp ..\olap\spark\materializar_vistas_metabase.py reservainteligente/${pod}:/tmp/
+
+kubectl exec -n reservainteligente $pod -- bash -c "PYSPARK_PYTHON=python3 PYSPARK_DRIVER_PYTHON=python3 /spark/bin/spark-submit --master 'local[*]' --packages org.postgresql:postgresql:42.7.1 /tmp/tendencias_consumo.py"
+kubectl exec -n reservainteligente $pod -- bash -c "PYSPARK_PYTHON=python3 PYSPARK_DRIVER_PYTHON=python3 /spark/bin/spark-submit --master 'local[*]' --packages org.postgresql:postgresql:42.7.1 /tmp/horarios_pico.py"
+kubectl exec -n reservainteligente $pod -- bash -c "PYSPARK_PYTHON=python3 PYSPARK_DRIVER_PYTHON=python3 /spark/bin/spark-submit --master 'local[*]' --packages org.postgresql:postgresql:42.7.1 /tmp/crecimiento_mensual.py"
+```
+
+Resultados en PostgreSQL: `analytics_tendencias_consumo`, `analytics_horarios_pico`, `analytics_crecimiento_mensual` (Req 2), y `analytics_ingresos_mes_categoria`, `analytics_actividad_zona`, `analytics_pedidos_estado` (Req 3, materializados por `materializar_vistas_metabase.py`).
+
+```powershell
+$pgPod = kubectl get pods -n reservainteligente -l app=postgres -o jsonpath='{.items[0].metadata.name}'
+kubectl exec -n reservainteligente $pgPod -- psql -U postgres -d restaurantes_db -c "SELECT * FROM analytics_tendencias_consumo LIMIT 5;"
+```
+
+---
+
+## 19. Airflow
+
+Estado de los pods de Airflow
+
+```powershell
+kubectl get pods -n reservainteligente -l "app in (airflow-postgres,airflow-scheduler,airflow-webserver)"
+kubectl get job airflow-init -n reservainteligente
+```
+
+Desplegar/redesplegar solo Airflow
+
+```powershell
+.\deploy-airflow.ps1
+```
+
+Logs
+
+```powershell
+kubectl logs -n reservainteligente -l app=airflow-scheduler --tail=50
+kubectl logs -n reservainteligente -l app=airflow-webserver --tail=50
+kubectl logs -n reservainteligente job/airflow-init --tail=50
+```
+
+Web UI Airflow (usuario/clave definidos en `airflow-secret.yaml`)
+
+```powershell
+kubectl port-forward -n reservainteligente svc/airflow-webserver 8080:8080
+# http://localhost:8080
+```
+
+Ver y disparar el DAG desde la CLI dentro del pod del scheduler
+
+```powershell
+$schedPod = kubectl get pods -n reservainteligente -l app=airflow-scheduler -o jsonpath='{.items[0].metadata.name}'
+
+kubectl exec -n reservainteligente $schedPod -- airflow dags list
+kubectl exec -n reservainteligente $schedPod -- airflow dags trigger etl_reserva_dw
+kubectl exec -n reservainteligente $schedPod -- airflow tasks states-for-dag-run etl_reserva_dw <run_id>
+```
+
+Ver/editar la Variable que controla la deteccion de cambios en el catalogo (usada por `verificar_cambio_catalogo`)
+
+```powershell
+kubectl exec -n reservainteligente $schedPod -- airflow variables get ultima_actualizacion_catalogo
+kubectl exec -n reservainteligente $schedPod -- airflow variables set ultima_actualizacion_catalogo "2000-01-01T00:00:00"
+```
+
+Forzar la rama de reindexado (provoca que `verificar_cambio_catalogo` detecte cambio y dispare `reindexar_elasticsearch` en la siguiente corrida)
+
+```powershell
+$pgPod = kubectl get pods -n reservainteligente -l app=postgres -o jsonpath='{.items[0].metadata.name}'
+kubectl exec -n reservainteligente $pgPod -- psql -U postgres -d restaurantes_db -c "UPDATE menus SET fecha_actualizacion = NOW() WHERE id = (SELECT id FROM menus LIMIT 1);"
+kubectl exec -n reservainteligente $schedPod -- airflow dags trigger etl_reserva_dw
+```
+
+---
+
+## 20. Metabase
+
+Estado del pod de Metabase
+
+```powershell
+kubectl get pods -n reservainteligente -l app=metabase
+```
+
+Desplegar/redesplegar solo Metabase
+
+```powershell
+.\deploy-metabase.ps1
+```
+
+Logs
+
+```powershell
+kubectl logs -n reservainteligente -l app=metabase --tail=50
+```
+
+Verificar que existen las tablas analytics_* que alimentan los dashboards (las materializa el DAG de Airflow)
+
+```powershell
+$pgPod = kubectl get pods -n reservainteligente -l app=postgres -o jsonpath='{.items[0].metadata.name}'
+kubectl exec -n reservainteligente $pgPod -- psql -U postgres -d restaurantes_db -c "SELECT * FROM analytics_ingresos_mes_categoria;"
+kubectl exec -n reservainteligente $pgPod -- psql -U postgres -d restaurantes_db -c "SELECT * FROM analytics_actividad_zona;"
+kubectl exec -n reservainteligente $pgPod -- psql -U postgres -d restaurantes_db -c "SELECT * FROM analytics_pedidos_estado;"
+```
+
+Web UI Metabase (primera vez pide crear el usuario admin)
+
+```powershell
+kubectl port-forward -n reservainteligente svc/metabase 3000:3000
+# http://localhost:3000
+```
+
+Datos para conectar la base de datos en el wizard de Metabase:
+
+- Tipo: PostgreSQL
+- Host: `postgres-service`
+- Puerto: `5432`
+- Base de datos: `restaurantes_db`
+- Usuario: `postgres`
+- Tablas a usar en los dashboards: `analytics_ingresos_mes_categoria`, `analytics_actividad_zona`, `analytics_pedidos_estado`
