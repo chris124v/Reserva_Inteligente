@@ -1,6 +1,6 @@
 """
 tendencias_consumo.py
----------------------
+
 Lee pedidos y menús desde PostgreSQL, explota el JSON de ítems, calcula
 ingresos y unidades vendidas por mes y categoría de producto, y escribe
 los resultados en la tabla analytics_tendencias_consumo de PostgreSQL.

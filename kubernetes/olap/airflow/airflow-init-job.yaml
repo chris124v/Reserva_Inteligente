@@ -1,0 +1,42 @@
+# Job de una sola corrida: inicializa el esquema de metadatos de Airflow y
+# crea el usuario admin si todavia no existe (idempotente, mismo criterio de
+# verificacion que el initContainer del Hive Metastore).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: airflow-init
+  namespace: reservainteligente
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: airflow-init
+          image: ghcr.io/chris124v/reserva_inteligente-airflow:latest
+          imagePullPolicy: Always
+          command:
+            - /bin/bash
+            - -c
+            - |
+              airflow db migrate
+              airflow users list | grep -qw "$AIRFLOW_ADMIN_USERNAME" || \
+                airflow users create \
+                  --username "$AIRFLOW_ADMIN_USERNAME" \
+                  --password "$AIRFLOW_ADMIN_PASSWORD" \
+                  --firstname Admin \
+                  --lastname ReservaInteligente \
+                  --role Admin \
+                  --email admin@reservainteligente.local
+          envFrom:
+            - configMapRef:
+                name: airflow-config
+            - secretRef:
+                name: airflow-secret
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"

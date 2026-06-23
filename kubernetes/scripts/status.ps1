@@ -10,7 +10,7 @@ if (-not (Get-Command kubectl -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-Write-Host "[1/7] Estado del cluster..." -ForegroundColor Yellow
+Write-Host "[1/8] Estado del cluster..." -ForegroundColor Yellow
 kubectl cluster-info --request-timeout=5s 2>&1 | Out-Null
 if ($LASTEXITCODE -eq 0) {
     Write-Host "  OK Kubernetes corriendo" -ForegroundColor Green
@@ -20,7 +20,7 @@ if ($LASTEXITCODE -eq 0) {
 }
 Write-Host ""
 
-Write-Host "[2/7] Namespace..." -ForegroundColor Yellow
+Write-Host "[2/8] Namespace..." -ForegroundColor Yellow
 $ns = kubectl get namespace reservainteligente --ignore-not-found=true 2>$null
 if ($ns) {
     Write-Host "  OK reservainteligente existe" -ForegroundColor Green
@@ -37,7 +37,7 @@ function Get-WorkloadStatus {
     return "OK"
 }
 
-Write-Host "[3/7] Stack operacional..." -ForegroundColor Yellow
+Write-Host "[3/8] Stack operacional..." -ForegroundColor Yellow
 $checks = @(
     @{kind="deployment"; name="main-api";       label="API"},
     @{kind="deployment"; name="search-service"; label="Search Service"},
@@ -59,14 +59,14 @@ foreach ($c in $checks) {
 }
 Write-Host ""
 
-Write-Host "[4/7] HDFS..." -ForegroundColor Yellow
+Write-Host "[4/8] HDFS..." -ForegroundColor Yellow
 $nnStatus = Get-WorkloadStatus -Kind statefulset -Name hdfs-namenode
 $dnStatus = Get-WorkloadStatus -Kind statefulset -Name hdfs-datanode
 if ($nnStatus -eq "OK") { Write-Host "  OK NameNode (RPC :8020, UI :9870)" -ForegroundColor Green } else { Write-Host "  X  NameNode" -ForegroundColor Red }
 if ($dnStatus -eq "OK") { Write-Host "  OK DataNode" -ForegroundColor Green } else { Write-Host "  X  DataNode" -ForegroundColor Red }
 Write-Host ""
 
-Write-Host "[5/7] Hive..." -ForegroundColor Yellow
+Write-Host "[5/8] Hive..." -ForegroundColor Yellow
 $msdbStatus = Get-WorkloadStatus -Kind statefulset -Name hive-metastore-db
 $msStatus   = Get-WorkloadStatus -Kind deployment  -Name hive-metastore
 $hs2Status  = Get-WorkloadStatus -Kind deployment  -Name hiveserver2
@@ -88,7 +88,7 @@ if ($hs2Status -eq "OK") {
 }
 Write-Host ""
 
-Write-Host "[6/7] Spark..." -ForegroundColor Yellow
+Write-Host "[6/8] Spark..." -ForegroundColor Yellow
 $smStatus = Get-WorkloadStatus -Kind deployment -Name spark-master
 $swStatus = Get-WorkloadStatus -Kind deployment -Name spark-worker
 if ($smStatus -eq "OK") { Write-Host "  OK Spark Master (:7077 cluster, :8080 UI)" -ForegroundColor Green } else { Write-Host "  X  Spark Master" -ForegroundColor Red }
@@ -108,7 +108,23 @@ if ($smStatus -eq "OK") {
 }
 Write-Host ""
 
-Write-Host "[7/7] Persistencia (PVC)..." -ForegroundColor Yellow
+Write-Host "[7/8] Airflow..." -ForegroundColor Yellow
+$apgStatus = Get-WorkloadStatus -Kind statefulset -Name airflow-postgres
+$aschStatus = Get-WorkloadStatus -Kind deployment  -Name airflow-scheduler
+$awebStatus = Get-WorkloadStatus -Kind deployment  -Name airflow-webserver
+if ($apgStatus  -eq "OK") { Write-Host "  OK Metadata DB (PostgreSQL)" -ForegroundColor Green } else { Write-Host "  X  Metadata DB" -ForegroundColor Red }
+if ($aschStatus -eq "OK") { Write-Host "  OK Scheduler (LocalExecutor)" -ForegroundColor Green } else { Write-Host "  X  Scheduler" -ForegroundColor Red }
+if ($awebStatus -eq "OK") { Write-Host "  OK Webserver (:8080)" -ForegroundColor Green }          else { Write-Host "  X  Webserver" -ForegroundColor Red }
+
+$initJobStatus = kubectl get job airflow-init -n reservainteligente --ignore-not-found=true -o jsonpath="{.status.succeeded}" 2>$null
+if ($initJobStatus -eq "1") {
+    Write-Host "  OK airflow-init completado (db migrate + usuario admin)" -ForegroundColor Green
+} else {
+    Write-Host "  - airflow-init no completado todavia" -ForegroundColor DarkGray
+}
+Write-Host ""
+
+Write-Host "[8/8] Persistencia (PVC)..." -ForegroundColor Yellow
 kubectl get pvc -n reservainteligente
 Write-Host ""
 
@@ -122,6 +138,7 @@ Write-Host "  Elasticsearch:  kubectl port-forward svc/elasticsearch 9200:9200 -
 Write-Host "  HDFS UI:        kubectl port-forward svc/hdfs-namenode 9870:9870 -n reservainteligente" -ForegroundColor White
 Write-Host "  HiveServer2 UI: kubectl port-forward svc/hiveserver2 10002:10002 -n reservainteligente" -ForegroundColor White
 Write-Host "  Spark Master UI:kubectl port-forward svc/spark-master 8080:8080 -n reservainteligente" -ForegroundColor White
+Write-Host "  Airflow UI:     kubectl port-forward svc/airflow-webserver 8080:8080 -n reservainteligente" -ForegroundColor White
 Write-Host ""
 Write-Host "Listo!" -ForegroundColor Green
 Write-Host ""

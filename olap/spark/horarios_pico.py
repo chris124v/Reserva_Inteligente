@@ -1,6 +1,6 @@
 """
 horarios_pico.py
-----------------
+
 Combina reservas y pedidos para detectar las horas y días de la semana
 con más actividad. Usa UNION ALL en SparkSQL para agregar ambas fuentes
 de forma independiente y evitar producto cartesiano.

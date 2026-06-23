@@ -1,0 +1,14 @@
+# Service de PostgreSQL de metadatos de Airflow
+# ClusterIP None (headless) para StatefulSet con DNS estable
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-postgres
+  namespace: reservainteligente
+spec:
+  selector:
+    app: airflow-postgres
+  clusterIP: None
+  ports:
+    - port: 5432
+      targetPort: 5432

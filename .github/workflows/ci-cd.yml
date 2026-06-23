@@ -33,6 +33,7 @@ env:
   REGISTRY: ghcr.io
   MAIN_API_IMAGE: ${{ github.repository }}-main-api
   SEARCH_SERVICE_IMAGE: ${{ github.repository }}-search-service
+  AIRFLOW_IMAGE: ${{ github.repository }}-airflow
 
   AWS_REGION: us-east-1
   AWS_COGNITO_REGION: us-east-1
@@ -159,6 +160,7 @@ jobs:
         run: |
           echo "MAIN_API_IMAGE_LC=$(echo '${{ env.MAIN_API_IMAGE }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
           echo "SEARCH_SERVICE_IMAGE_LC=$(echo '${{ env.SEARCH_SERVICE_IMAGE }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          echo "AIRFLOW_IMAGE_LC=$(echo '${{ env.AIRFLOW_IMAGE }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       # Hace login en Ghcr
       # Solo se ejecuta en push, no en pull_request.
@@ -203,3 +205,21 @@ jobs:
         run: |
           docker push $REGISTRY/$SEARCH_SERVICE_IMAGE_LC:${{ github.sha }}
           docker push $REGISTRY/$SEARCH_SERVICE_IMAGE_LC:latest
+
+      # Construye la imagen Docker de Airflow (DAGs + scripts de Spark incluidos).
+      # Usa olap/airflow/Dockerfile, contexto en la raiz del repo para poder
+      # copiar tanto olap/airflow/ como olap/spark/.
+      - name: Build Airflow Docker image
+        run: |
+          docker build \
+            -t $REGISTRY/$AIRFLOW_IMAGE_LC:${{ github.sha }} \
+            -t $REGISTRY/$AIRFLOW_IMAGE_LC:latest \
+            -f olap/airflow/Dockerfile .
+
+      # Publica la imagen de Airflow en GHCR.
+      # Solo se publica cuando hay push.
+      - name: Push Airflow Docker image
+        if: github.event_name == 'push'
+        run: |
+          docker push $REGISTRY/$AIRFLOW_IMAGE_LC:${{ github.sha }}
+          docker push $REGISTRY/$AIRFLOW_IMAGE_LC:latest

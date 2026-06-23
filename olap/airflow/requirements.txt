@@ -1,0 +1,6 @@
+pyspark==3.5.3
+psycopg2-binary==2.9.11
+pyhive[hive_pure_sasl]==0.7.0
+requests==2.32.3
+apache-airflow-providers-postgres==5.13.1
+apache-airflow-providers-http==4.13.3

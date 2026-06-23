@@ -1,0 +1,13 @@
+# Service del Airflow Webserver, expuesto dentro del cluster vía port-forward
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-webserver
+  namespace: reservainteligente
+spec:
+  selector:
+    app: airflow-webserver
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP

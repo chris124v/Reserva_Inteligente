@@ -1,0 +1,18 @@
+# ConfigMap con configuracion no sensible de Airflow.
+# Las Connections sin credenciales (AIRFLOW_CONN_SEARCH_SERVICE) tambien viven
+# aqui; las que llevan password van en airflow-secret.yaml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-config
+  namespace: reservainteligente
+data:
+  AIRFLOW__CORE__EXECUTOR: "LocalExecutor"
+  AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+  AIRFLOW__CORE__DAGS_FOLDER: "/opt/airflow/dags"
+  AIRFLOW__CORE__DEFAULT_TIMEZONE: "utc"
+  AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "False"
+  AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: "30"
+
+  # Connection HTTP hacia search-service, sin credenciales
+  AIRFLOW_CONN_SEARCH_SERVICE: "http://search-service"

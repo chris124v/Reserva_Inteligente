@@ -1,6 +1,6 @@
 """
 crecimiento_mensual.py
-----------------------
+
 Calcula el total de ingresos, pedidos y clientes activos por mes y aplica
 la función de ventana LAG() para obtener el porcentaje de crecimiento
 mes a mes (MoM). Demuestra Window Functions en SparkSQL.
