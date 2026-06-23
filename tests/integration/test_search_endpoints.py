@@ -120,7 +120,7 @@ def test_post_reindex_calls_upstream_and_returns_summary(client, monkeypatch):
 
     monkeypatch.setattr(
         "search_service.app.routes.search.httpx.Client",
-        lambda timeout=30.0: _FakeClientContext(mock_http_client),
+        lambda timeout=30.0, follow_redirects=False: _FakeClientContext(mock_http_client),
     )
     monkeypatch.setattr(
         "search_service.app.routes.search.reindex_menus",
@@ -144,7 +144,7 @@ def test_post_reindex_returns_error_when_upstream_fails(client, monkeypatch):
 
     monkeypatch.setattr(
         "search_service.app.routes.search.httpx.Client",
-        lambda timeout=30.0: _FailingClientContext(),
+        lambda timeout=30.0, follow_redirects=False: _FailingClientContext(),
     )
 
     response = client.post("/search/reindex")
