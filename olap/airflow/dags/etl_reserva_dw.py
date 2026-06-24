@@ -2,14 +2,24 @@
 etl_reserva_dw.py
 ------------------
 DAG diario que orquesta: transformación con Spark + carga al Data Warehouse
-(Hive) -> verificación de cambios en el catálogo de menús -> reindexado
-condicional de Elasticsearch.
+(Hive) -> análisis OLAP con Spark -> materialización para Metabase ->
+verificación de cambios en el catálogo de menús -> reindexado condicional de
+Elasticsearch.
 
-cargar_dw_hive          corre etl_dimensiones_hechos.py con spark-submit local[*]
+cargar_dw_hive             corre etl_dimensiones_hechos.py con spark-submit local[*]
+analisis_tendencias_consumo \
+analisis_horarios_pico       > los 3 análisis Spark obligatorios (Req 2); leen de
+analisis_crecimiento_mensual /  PostgreSQL operacional y escriben tablas analytics_*
+materializar_vistas_metabase  materializa las 3 vistas Hive a tablas analytics_*
 verificar_cambio_catalogo  compara MAX(fecha_actualizacion) de menus contra la
                            corrida anterior (Airflow Variable); si no cambió,
                            hace short-circuit y se saltan las tareas siguientes
 reindexar_elasticsearch    POST a search-service/search/reindex
+
+Nota de diseño: todas las tareas spark-submit se encadenan en SERIE (no en
+paralelo) a propósito. El cluster es de un solo nodo y con todo el stack OLAP
+arriba la CPU queda al límite; dos spark-submit simultáneos se quedarían sin
+recursos. Correr uno a la vez es más lento pero confiable.
 """
 
 from datetime import datetime, timedelta
@@ -69,14 +79,26 @@ with DAG(
     tags=["olap", "spark", "hive", "elasticsearch"],
 ) as dag:
 
-    cargar_dw_hive = BashOperator(
-        task_id="cargar_dw_hive",
-        bash_command=(
-            "PYSPARK_PYTHON=python3 PYSPARK_DRIVER_PYTHON=python3 "
-            f"spark-submit --master local[*] --packages {SPARK_PACKAGES} "
-            "/opt/spark-scripts/etl_dimensiones_hechos.py"
-        ),
-    )
+    def _spark_submit(task_id, script):
+        """Crea una tarea que corre un script de Spark en modo local[*]."""
+        return BashOperator(
+            task_id=task_id,
+            bash_command=(
+                "PYSPARK_PYTHON=python3 PYSPARK_DRIVER_PYTHON=python3 "
+                f"spark-submit --master local[*] --packages {SPARK_PACKAGES} "
+                f"/opt/spark-scripts/{script}"
+            ),
+        )
+
+    cargar_dw_hive = _spark_submit("cargar_dw_hive", "etl_dimensiones_hechos.py")
+
+    # Los 3 análisis Spark obligatorios (Req 2). Leen de PostgreSQL operacional y
+    # escriben las tablas analytics_tendencias_consumo / analytics_horarios_pico /
+    # analytics_crecimiento_mensual. Al correr en el DAG quedan siempre en sync con
+    # el seed actual (antes solo se generaban a mano y se desactualizaban).
+    analisis_tendencias_consumo  = _spark_submit("analisis_tendencias_consumo",  "tendencias_consumo.py")
+    analisis_horarios_pico       = _spark_submit("analisis_horarios_pico",       "horarios_pico.py")
+    analisis_crecimiento_mensual = _spark_submit("analisis_crecimiento_mensual", "crecimiento_mensual.py")
 
     # Materializa las 3 vistas OLAP de Hive en tablas analytics_* de PostgreSQL
     # para que Metabase las consuma de forma nativa, sin driver de Hive.
@@ -95,4 +117,13 @@ with DAG(
         python_callable=_reindexar_elasticsearch,
     )
 
-    cargar_dw_hive >> materializar_vistas_metabase >> verificar_cambio_catalogo >> reindexar_elasticsearch
+    # Cadena lineal: todos los spark-submit corren de a uno (ver nota de diseño).
+    (
+        cargar_dw_hive
+        >> analisis_tendencias_consumo
+        >> analisis_horarios_pico
+        >> analisis_crecimiento_mensual
+        >> materializar_vistas_metabase
+        >> verificar_cambio_catalogo
+        >> reindexar_elasticsearch
+    )
