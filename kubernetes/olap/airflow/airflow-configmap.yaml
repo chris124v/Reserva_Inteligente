@@ -13,6 +13,15 @@ data:
   AIRFLOW__CORE__DEFAULT_TIMEZONE: "utc"
   AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "False"
   AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: "30"
+  # Default de Airflow 2.x es solo "session" (cookie de login), que rechaza con 401
+  # las llamadas REST con HTTP Basic Auth (usadas por olap/validate_airflow.py).
+  # Se agrega basic_auth sin quitar session, para no romper el login de la UI web.
+  AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.session,airflow.api.auth.backend.basic_auth"
+  # Con todo el stack OLAP corriendo a la vez el nodo queda al ~97% de los limites
+  # de CPU; 4 workers gunicorn (default) compitiendo por arrancar superan el
+  # timeout de 120s del propio healthcheck de Airflow y el container se reinicia
+  # en bucle. 2 workers alcanza para este volumen de uso y arranca mas rapido.
+  AIRFLOW__WEBSERVER__WORKERS: "2"
 
   # Connection HTTP hacia search-service, sin credenciales
   AIRFLOW_CONN_SEARCH_SERVICE: "http://search-service"
