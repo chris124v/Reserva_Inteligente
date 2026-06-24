@@ -94,192 +94,6 @@ El sistema maneja dos roles en la BD local (`users.rol`):
 
 ---
 
-## Estructura del Proyecto
-
-```
-Reserva_Inteligente/
-├── .env.example
-├── .gitignore
-├── .github/
-│   └── workflows/
-│       └── ci-cd.yml
-├── Dockerfile
-├── docker-compose.yml
-├── pytest.ini
-├── README.md
-│
-├── app/
-│   ├── __init__.py
-│   ├── config.py
-│   ├── main.py
-│   ├── requirements.txt
-│   ├── auth/
-│   │   ├── __init__.py
-│   │   ├── cognito.py
-│   │   └── middleware.py
-│   ├── database/
-│   │   ├── __init__.py
-│   │   ├── connection.py
-│   │   ├── elastic.py
-│   │   ├── init_db.py
-│   │   ├── mongo.py
-│   │   ├── redis.py
-│   │   └── session.py
-│   ├── dao/
-│   │   ├── __init__.py
-│   │   ├── base_dao.py
-│   │   ├── factory.py
-│   │   ├── mongodb/
-│   │   │   ├── __init__.py
-│   │   │   ├── menu_dao.py
-│   │   │   ├── order_dao.py
-│   │   │   ├── reservation_dao.py
-│   │   │   ├── restaurant_dao.py
-│   │   │   └── user_dao.py
-│   │   └── postgresql/
-│   │       ├── __init__.py
-│   │       ├── menu_dao.py
-│   │       ├── order_dao.py
-│   │       ├── reservation_dao.py
-│   │       ├── restaurant_dao.py
-│   │       └── user_dao.py
-│   ├── models/
-│   │   ├── __init__.py
-│   │   ├── base.py
-│   │   ├── menu.py
-│   │   ├── order.py
-│   │   ├── reservation.py
-│   │   ├── restaurant.py
-│   │   └── user.py
-│   ├── routes/
-│   │   ├── __init__.py
-│   │   ├── auth.py
-│   │   ├── menus.py
-│   │   ├── orders.py
-│   │   ├── reservations.py
-│   │   ├── restaurants.py
-│   │   ├── users.py
-│   │   └── ReservaRestaurantes.postman_collection.json
-│   ├── schemas/
-│   │   ├── __init__.py
-│   │   ├── menu.py
-│   │   ├── order.py
-│   │   ├── reservation.py
-│   │   ├── restaurant.py
-│   │   └── user.py
-│   └── services/
-│       ├── __init__.py
-│       ├── cache_service.py
-│       ├── menu_service.py
-│       ├── order_service.py
-│       ├── reservation_service.py
-│       ├── restaurant_service.py
-│       ├── search_service.py
-│       └── user_service.py
-│
-├── data/
-│   └── seeds/
-│       ├── instrucciones_seed.md
-│       ├── mongo_cleanup.js
-│       ├── mongo_seed.js
-│       ├── postgres_cleanup.sql
-│       └── postgres_seed.sql
-│
-├── kubernetes/
-│   ├── Instrucciones.md
-│   ├── namespace.yaml
-│   ├── api/
-│   │   ├── Instrucciones.md
-│   │   ├── main-api/
-│   │   │   ├── deployment.yaml
-│   │   │   └── service.yaml
-│   │   └── search-service/
-│   │       ├── deployment.yaml
-│   │       └── service.yaml
-│   ├── balancer/
-│   │   ├── nginx-configmap.yaml
-│   │   ├── nginx-deployment.yaml
-│   │   └── nginx-service.yaml
-│   ├── config/
-│   │   ├── configmap.yaml
-│   │   ├── secret.yaml
-│   │   └── secretsexample.yaml
-│   ├── databases/
-│   │   ├── elasticsearch/
-│   │   │   ├── pvc.yaml
-│   │   │   ├── service.yaml
-│   │   │   └── statefulset.yaml
-│   │   ├── mongodb/
-│   │   │   ├── easy/
-│   │   │   │   ├── service.yaml
-│   │   │   │   └── statefulset.yaml
-│   │   │   ├── sharding/
-│   │   │   │   ├── config-server-statefulset.yaml
-│   │   │   │   ├── init-sharding-job.yaml
-│   │   │   │   ├── init-sharding-job-idempotent.yaml
-│   │   │   │   ├── mongos-deployment.yaml
-│   │   │   │   └── shard1-statefulset.yaml
-│   │   │   └── Pruebas-Sharding.md
-│   │   ├── postgres/
-│   │   │   ├── service.yaml
-│   │   │   └── statefulset.yaml
-│   │   └── redis/
-│   │       ├── deployment.yaml
-│   │       └── service.yaml
-│   └── scripts/
-│       ├── .gitignore
-│       ├── cleanup-all.ps1
-│       ├── deploy-all.ps1
-│       ├── kind-config.yaml
-│       └── status.ps1
-│
-├── search_service/
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── app/
-│       ├── main.py
-│       ├── routes/
-│       │   └── search.py
-│       └── services/
-│           └── search_service.py
-│
-└── tests/
-    ├── __init__.py
-    ├── Instrucciones_tests.md
-    ├── conftest.py
-    ├── pytest.ini
-    ├── data/
-    │   ├── menus.json
-    │   ├── orders.json
-    │   ├── reservations.json
-    │   ├── restaurants.json
-    │   └── users.json
-    ├── integration/
-    │   ├── __init__.py
-    │   ├── test_api_endpoints.py
-    │   ├── test_auth_cognito.py
-    │   ├── test_daos.py
-    │   ├── test_flows.py
-    │   ├── test_mongodb.py
-    │   ├── test_nginx.py
-    │   ├── test_redis.py
-    │   ├── test_search_endpoints.py
-    │   └── tests_posgres.py
-    └── unit/
-        ├── __init__.py
-        ├── test_cache_service.py
-        ├── test_menu_service.py
-        ├── test_order_service.py
-        ├── test_reservation_service.py
-        ├── test_restaurant_service.py
-        ├── test_search_service.py
-        ├── test_services.py
-        ├── test_user_service.py
-        └── test_validation.py
-```
-
----
-
 ## Instrucciones de Ejecución
 
 ### Requisitos Previos
@@ -540,3 +354,99 @@ Entrar a instrucciones_seed.md para ejecutar cada archivo de seeding tanto para 
 | GET | `/search/menus?q=texto` | Buscar menús | No |
 | GET | `/search/menus/category/{cat}` | Filtrar por categoría | No |
 | POST | `/search/reindex` | Reindexar menús | No |
+
+---
+
+## Paso 9: Desplegar OLAP, Spark, Hive y Airflow
+
+Este paso despliega el stack de análisis de datos: HDFS, Hive, Spark y Airflow.
+
+```powershell
+cd kubernetes\scripts
+.\deploy-olap.ps1
+.\deploy-airflow.ps1
+.\deploy-metabase.ps1
+```
+
+### Port-forwards necesarios para OLAP
+
+```powershell
+# Airflow UI
+kubectl port-forward -n reservainteligente svc/airflow-webserver 8080:8080
+# Metabase UI
+kubectl port-forward -n reservainteligente svc/metabase 3000:3000
+# HiveServer2
+kubectl port-forward -n reservainteligente svc/hiveserver2 10000:10000
+# Spark Master UI
+kubectl port-forward -n reservainteligente svc/spark-master 8081:8080
+```
+
+### Disparar el pipeline manualmente
+
+```powershell
+kubectl exec -n reservainteligente deployment/airflow-scheduler -- airflow dags trigger etl_reserva_dw
+```
+
+O desde la UI de Airflow en `http://localhost:8080` (usuario: `admin`, password: `admin`).
+
+---
+
+## Paso 10: Pruebas y Validaciones
+
+Las validaciones verifican la integridad del sistema completo: Neo4J, pipeline de Airflow, análisis Spark y Data Warehouse.
+
+### Requisitos
+
+```powershell
+pip install neo4j psycopg2-binary requests pyhive thrift
+```
+
+### Port-forwards necesarios
+
+Abrir cada uno en una terminal separada:
+
+```powershell
+# Neo4J
+kubectl port-forward svc/neo4j-service 7474:7474 7687:7687 -n reservainteligente
+# Airflow
+kubectl port-forward svc/airflow-webserver 8080:8080 -n reservainteligente
+# PostgreSQL
+kubectl port-forward svc/postgres-service 5432:5432 -n reservainteligente
+# HiveServer2
+kubectl port-forward svc/hiveserver2 10000:10000 -n reservainteligente
+```
+
+### Correr todas las validaciones de una vez
+
+```powershell
+python validate_all.py
+```
+
+### O correr cada validación individualmente
+
+```powershell
+# 1. Neo4J — grafo, consultas Cypher, rutas de entrega
+$env:NEO4J_PASSWORD="Neo4jPass123!"
+python Neo4j/validate_neo4j.py
+
+# 2. Airflow — pipeline ETL y schedule @daily
+python olap/validate_airflow.py
+
+# 3. Spark — análisis de tendencias, horarios pico y crecimiento mensual
+python olap/validate_spark.py
+
+# 4. Data Warehouse — integridad de tablas analytics_* y esquema estrella
+python olap/validate_dw.py
+```
+
+### Reportes exportables
+
+Cada script genera un reporte JSON en su carpeta:
+
+| Script | Reporte |
+|--------|---------|
+| `Neo4j/validate_neo4j.py` | `Neo4j/validation_report.json` |
+| `olap/validate_airflow.py` | `olap/validate_airflow_report.json` |
+| `olap/validate_spark.py` | `olap/validate_spark_report.json` |
+| `olap/validate_dw.py` | `olap/validate_dw_report.json` |
+| `validate_all.py` | `validate_all_report.json` |

@@ -42,3 +42,11 @@ build/
 # OS
 *.log
 Thumbs.db
+
+#olap
+olap/airflow/airflow-secret.yaml
+
+# Reportes de validación (generados localmente)
+**/validation_report.json
+**/validate_*_report.json
+validate_all_report.json
