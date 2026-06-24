@@ -560,12 +560,29 @@ kubectl port-forward -n reservainteligente svc/airflow-webserver 8080:8080
 # http://localhost:8080
 ```
 
+El DAG `etl_reserva_dw` tiene 7 tareas, todas en serie (un solo `spark-submit` a la vez —
+el nodo es de un solo core compartido entre todo el stack OLAP, dos Spark a la vez se
+quedan sin recursos):
+
+```
+cargar_dw_hive
+  -> analisis_tendencias_consumo      (Req 2: tendencias de consumo)
+  -> analisis_horarios_pico           (Req 2: horarios pico)
+  -> analisis_crecimiento_mensual     (Req 2: crecimiento mensual MoM)
+  -> materializar_vistas_metabase     (tablas analytics_* para los dashboards)
+  -> verificar_cambio_catalogo        (ShortCircuitOperator)
+  -> reindexar_elasticsearch          (solo si el catalogo de menus cambio)
+```
+
+Corrida completa: ~15-16 min (6 `spark-submit` en serie + materializacion).
+
 Ver y disparar el DAG desde la CLI dentro del pod del scheduler
 
 ```powershell
 $schedPod = kubectl get pods -n reservainteligente -l app=airflow-scheduler -o jsonpath='{.items[0].metadata.name}'
 
 kubectl exec -n reservainteligente $schedPod -- airflow dags list
+kubectl exec -n reservainteligente $schedPod -- airflow tasks list etl_reserva_dw
 kubectl exec -n reservainteligente $schedPod -- airflow dags trigger etl_reserva_dw
 kubectl exec -n reservainteligente $schedPod -- airflow tasks states-for-dag-run etl_reserva_dw <run_id>
 ```
@@ -605,7 +622,7 @@ kubectl get pods -n reservainteligente -l "app in (airflow-scheduler,airflow-web
 kubectl scale deployment/airflow-scheduler deployment/airflow-webserver --replicas=1 -n reservainteligente
 kubectl rollout status deployment/airflow-scheduler -n reservainteligente --timeout=300s
 
-# 3) verificar que el pod corre la imagen nueva y el DAG tiene las 4 tasks
+# 3) verificar que el pod corre la imagen nueva y el DAG tiene las 7 tasks
 $schedPod = kubectl get pods -n reservainteligente -l app=airflow-scheduler -o jsonpath='{.items[0].metadata.name}'
 kubectl get pod $schedPod -n reservainteligente -o jsonpath='{.status.containerStatuses[*].imageID}'; Write-Host ""
 kubectl exec -n reservainteligente $schedPod -- airflow tasks list etl_reserva_dw
@@ -797,3 +814,83 @@ kubectl delete configmap/neo4j-config -n reservainteligente
 kubectl delete secret/neo4j-secret -n reservainteligente
 kubectl delete pvc/neo4j-storage-neo4j-0 -n reservainteligente
 ```
+
+---
+
+## 22. Pruebas de Validacion
+
+Scripts que verifican (no generan datos, solo comprueban) que cada capa del proyecto
+funciona end-to-end: integridad del Data Warehouse, ejecucion periodica de Airflow,
+resultados de Spark y del grafo de Neo4J. Cubren la seccion "Pruebas y Validaciones"
+del spec. Cada script imprime un resumen en consola y exporta un reporte JSON
+(gitignored) junto al propio script.
+
+| Script | Verifica | Reporte |
+|---|---|---|
+| `Neo4j/validate_neo4j.py` | Integridad del grafo (nodos/relaciones minimas) + las 3 consultas del Req 5 + Req 6 (rutas) | `Neo4j/validation_report.json` |
+| `olap/validate_dw.py` | Conectividad Postgres, tablas `analytics_*`, datos origen, 7 tablas del esquema estrella en Hive | `olap/validate_dw_report.json` |
+| `olap/validate_spark.py` | Los 3 analisis obligatorios (tendencias, horarios pico, crecimiento MoM con `LAG()`) | `olap/validate_spark_report.json` |
+| `olap/validate_airflow.py` | DAG activo, schedule `@daily`, historial de corridas (incluye `scheduled`, no solo manuales), estado de las 7 tareas | `olap/validate_airflow_report.json` |
+| `validate_all.py` (raiz) | Corre los 4 anteriores en orden y junta un resumen global | `validate_all_report.json` |
+
+### Prerequisitos
+
+Dependencias Python (usar el venv del proyecto):
+
+```powershell
+.venv\Scripts\python.exe -m pip install neo4j psycopg2-binary requests pyhive thrift thrift_sasl pure-sasl
+```
+
+Port-forwards necesarios (cada uno en su propia terminal, o con `run_in_background`):
+
+```powershell
+kubectl port-forward svc/neo4j-service 7687:7687 -n reservainteligente
+kubectl port-forward svc/postgres-service 5432:5432 -n reservainteligente
+kubectl port-forward svc/hiveserver2 10000:10000 -n reservainteligente
+kubectl port-forward svc/airflow-webserver 8080:8080 -n reservainteligente
+```
+
+Credenciales por variable de entorno (extraerlas de los Secrets, igual que hace `deploy-neo4j.ps1`):
+
+```powershell
+$env:NEO4J_USER = "neo4j"
+$env:NEO4J_PASSWORD = "Neo4jPass123!"          # ver kubernetes/databases/Neo4j/secret.yaml
+$env:PG_PASSWORD    = "MySecurePass123!"        # ver kubernetes/config/secret.yaml (DATABASE_PASSWORD)
+$env:AIRFLOW_USER   = "admin"
+$env:AIRFLOW_PASS   = "ReservaAdmin2026!"       # ver kubernetes/olap/airflow/airflow-secret.yaml (AIRFLOW_ADMIN_PASSWORD)
+```
+
+### Correr todo de una vez
+
+```powershell
+Set-Location "<raiz del repo>"
+.venv\Scripts\python.exe validate_all.py
+```
+
+Sale con exit code 0 si las 4 validaciones pasaron, 1 si alguna fallo. Util para CI o para
+confirmar rapido que un redeploy completo (`deploy-all.ps1` + `deploy-olap.ps1`) quedo sano.
+
+### Correr una validacion individual
+
+```powershell
+.venv\Scripts\python.exe Neo4j\validate_neo4j.py
+.venv\Scripts\python.exe olap\validate_dw.py
+.venv\Scripts\python.exe olap\validate_spark.py
+.venv\Scripts\python.exe olap\validate_airflow.py
+```
+
+### Notas
+
+- `validate_airflow.py` necesita que la API REST de Airflow acepte Basic Auth. El
+  ConfigMap (`kubernetes/olap/airflow/airflow-configmap.yaml`) ya tiene
+  `AIRFLOW__API__AUTH_BACKENDS` con `basic_auth` agregado al backend `session` por
+  defecto; si se reescribe el ConfigMap sin este valor, el script falla con `401`.
+- Si `olap/validate_dw.py` reporta "pyhive no instalado" pero `pip show pyhive` dice que
+  si esta instalado: falta `thrift_sasl` (pyhive lo importa internamente al conectar,
+  incluso con `auth="NONE"`). Instalar `thrift_sasl` y `pure-sasl` (no requieren compilar
+  nada en Windows).
+- `analytics_tendencias_consumo`, `analytics_horarios_pico` y `analytics_crecimiento_mensual`
+  ahora se regeneran en cada corrida del DAG (tareas `analisis_*`, ver seccion 19) - si
+  `validate_spark.py` falla en "Window functions LAG() aplicadas", corre el DAG
+  (`airflow dags trigger etl_reserva_dw`) antes de re-validar; ese check necesita 2+ meses
+  de pedidos para poder calcular el crecimiento mes a mes.
