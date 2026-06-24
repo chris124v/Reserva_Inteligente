@@ -42,7 +42,7 @@ $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 $kubernetesPath = Split-Path -Parent $scriptPath
 Set-Location $kubernetesPath
 
-Write-Host "[1/5] Deteniendo stack operacional..." -ForegroundColor Yellow
+Write-Host "[1/7] Deteniendo stack operacional..." -ForegroundColor Yellow
 Stop-Workload -Kind deployment -Name main-api
 Stop-Workload -Kind deployment -Name search-service
 Stop-Workload -Kind deployment -Name nginx-balancer
@@ -55,13 +55,13 @@ Stop-Workload -Kind statefulset -Name elasticsearch
 Write-Host "OK Stack operacional detenido" -ForegroundColor Green
 Write-Host ""
 
-Write-Host "[2/5] Deteniendo Spark..." -ForegroundColor Yellow
+Write-Host "[2/7] Deteniendo Spark..." -ForegroundColor Yellow
 Stop-Workload -Kind deployment -Name spark-master
 Stop-Workload -Kind deployment -Name spark-worker
 Write-Host "OK Spark detenido" -ForegroundColor Green
 Write-Host ""
 
-Write-Host "[3/6] Deteniendo Hive y HDFS..." -ForegroundColor Yellow
+Write-Host "[3/7] Deteniendo Hive y HDFS..." -ForegroundColor Yellow
 Stop-Workload -Kind deployment -Name hiveserver2
 Stop-Workload -Kind deployment -Name hive-metastore
 Stop-Workload -Kind statefulset -Name hive-metastore-db

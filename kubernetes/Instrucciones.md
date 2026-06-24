@@ -698,6 +698,46 @@ kubectl port-forward svc/neo4j-service 7474:7474 7687:7687 -n reservainteligente
 # http://localhost:7474  (usuario: neo4j, clave: en secret.yaml)
 ```
 
+### Conectarse desde Neo4J Desktop (alternativa al Browser web)
+
+Con el port-forward de arriba activo, Neo4J Desktop se conecta igual que a cualquier instancia remota via Bolt:
+
+1. Abrir Neo4J Desktop → **Add** → **Remote connection** (no "Local DBMS", porque no es una instancia que corre en tu maquina, es la del cluster).
+2. Connection URL: `bolt://localhost:7687`
+3. Usuario: `neo4j`
+4. Password: la del `secret.yaml` (`Neo4jPass123!` en este proyecto)
+5. Connect. Una vez conectado se puede usar el Cypher editor de Desktop igual que el Browser web para correr `Neo4j\queries.cypher`.
+
+Mientras el port-forward este activo en la terminal, la conexion se mantiene. Si se cierra la terminal del port-forward, Desktop pierde la conexion y hay que volver a correr el `kubectl port-forward`.
+
+### Ver el grafo visualmente (Neo4J Desktop o Browser)
+
+`MATCH ... RETURN n` (en vez de `RETURN n.propiedad`) renderiza un grafo visual interactivo: nodos como bolitas de colores (un color por label) y relaciones como lineas etiquetadas, en vez de una tabla.
+
+```cypher
+// Vista general (limitado para que no se sature)
+MATCH (n) RETURN n LIMIT 100
+
+// Solo los geonodos de zonas y sus distancias (Req 5)
+MATCH (z1:Zona)-[r:DISTANCIA_A]->(z2:Zona)
+RETURN z1, r, z2
+
+// Red de referidos (usuarios que recomiendan a otros)
+MATCH (u:Usuario)-[r:RECOMENDO]->(otro:Usuario)
+RETURN u, r, otro
+
+// Un pedido especifico con todo lo que toca: usuario, restaurante, productos
+MATCH (u:Usuario)-[:REALIZO]->(o:Pedido)-[:EN]->(r:Restaurante)
+MATCH (o)-[:CONTIENE]->(p:Producto)
+WHERE o.id = 1
+RETURN u, o, r, p
+```
+
+Tips de la UI (Desktop y Browser web comparten el mismo visualizador):
+- Doble clic en un nodo lo expande mostrando sus relaciones vecinas
+- Clic en el circulo de color de una label (panel superior de resultados) permite elegir que propiedad mostrar como texto sobre cada nodo (ej. `nombre` en vez del id interno)
+- El panel de estilos del grafo permite ajustar tamano/color de nodos en base a una propiedad numerica
+
 ### Verificar grafo con cypher-shell
 
 ```powershell

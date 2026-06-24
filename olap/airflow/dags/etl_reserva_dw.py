@@ -79,7 +79,7 @@ with DAG(
     )
 
     # Materializa las 3 vistas OLAP de Hive en tablas analytics_* de PostgreSQL
-    # para que Metabase (Req 3) las consuma de forma nativa, sin driver de Hive.
+    # para que Metabase las consuma de forma nativa, sin driver de Hive.
     materializar_vistas_metabase = BashOperator(
         task_id="materializar_vistas_metabase",
         bash_command="python3 /opt/spark-scripts/materializar_vistas_metabase.py",
