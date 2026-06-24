@@ -31,6 +31,7 @@ docker-compose.override.yml
 # Kubernetes secrets (los valores reales viven solo local; usar los *example*.yaml como plantilla)
 kubernetes/config/secret.yaml
 kubernetes/olap/airflow/airflow-secret.yaml
+kubernetes/databases/Neo4j/secret.yaml
 
 # Python
 dist/

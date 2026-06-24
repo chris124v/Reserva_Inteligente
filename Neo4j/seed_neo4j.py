@@ -25,24 +25,28 @@ Uso (con port-forward activo):
   python neo4j/seed_neo4j.py
 """
 
+import os
 import psycopg2
 import random
 import json
 from neo4j import GraphDatabase
 
 # ── Configuracion ─────────────────────────────────────────────────────────────
-# Estas IPs son localhost porque se accede via port-forward de Kubernetes
+# Credenciales por variable de entorno (no hardcodeadas). El script de despliegue
+# (deploy-neo4j.ps1) las extrae de los Secrets de Kubernetes antes de correr esto.
+# Para correr manual: setear PG_PASSWORD y NEO4J_PASSWORD en el entorno.
+# Host localhost porque se accede via port-forward de Kubernetes.
 PG_CONFIG = {
-    "host":     "localhost",
-    "port":     5432,
-    "dbname":   "restaurantes_db",
-    "user":     "postgres",
-    "password": "MySecurePass123!",
+    "host":     os.environ.get("PG_HOST", "localhost"),
+    "port":     int(os.environ.get("PG_PORT", "5432")),
+    "dbname":   os.environ.get("PG_DBNAME", "restaurantes_db"),
+    "user":     os.environ.get("PG_USER", "postgres"),
+    "password": os.environ.get("PG_PASSWORD", "postgres"),
 }
 
-NEO4J_URI      = "bolt://localhost:7687"
-NEO4J_USER     = "neo4j"
-NEO4J_PASSWORD = "Neo4jPass123!"
+NEO4J_URI      = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_USER     = os.environ.get("NEO4J_USER", "neo4j")
+NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "neo4j")
 
 # ── Zonas y distancias para rutas de entrega ──────────────────────────────────
 # Zonas extraidas de las direcciones de los restaurantes del seed
@@ -162,9 +166,16 @@ def cargar_pedidos(session, cur):
     for oid, uid, rid, items_raw, total, estado, tipo, fecha in cur.fetchall():
         items = items_raw if isinstance(items_raw, list) else json.loads(items_raw)
 
+        # Postgres guarda estado/tipo_entrega en MAYUSCULA (enums SQLAlchemy), pero
+        # todas las consultas Cypher comparan en minuscula. Normalizamos aqui para
+        # que los filtros (estado <> 'cancelado', tipo_entrega = 'domicilio', etc.)
+        # funcionen de forma consistente en el grafo.
+        estado_norm = (estado or "").lower()
+        tipo_norm   = (tipo or "").lower()
+
         # Asignar zona de entrega distinta a la del restaurante para pedidos a domicilio
         zona_rest = zona_por_restaurante.get(rid, ZONAS[0])
-        if tipo and tipo.upper() == "DOMICILIO":
+        if tipo_norm == "domicilio":
             zonas_disponibles = [z for z in ZONAS if z != zona_rest]
             zona_entrega = random.choice(zonas_disponibles)
         else:
@@ -182,8 +193,8 @@ def cargar_pedidos(session, cur):
             MATCH (r:Restaurante {id: $rid})
             MERGE (u)-[:REALIZO]->(o)
             MERGE (o)-[:EN]->(r)
-        """, id=oid, total=float(total), estado=estado,
-             tipo=tipo, zona_entrega=zona_entrega, fecha=str(fecha), uid=uid, rid=rid)
+        """, id=oid, total=float(total), estado=estado_norm,
+             tipo=tipo_norm, zona_entrega=zona_entrega, fecha=str(fecha), uid=uid, rid=rid)
 
         # Relacion CONTIENE por cada producto del pedido
         for item in items:
@@ -195,12 +206,41 @@ def cargar_pedidos(session, cur):
                 ON MATCH  SET c.cantidad = c.cantidad + $cantidad
             """, oid=oid, pid=item["menu_id"], cantidad=item["cantidad"])
 
+def crear_recomendaciones(session, cur):
+    """
+    Crea una red de referidos sintetica: relaciones (Usuario)-[:RECOMENDO]->(Usuario).
+    El modelo operacional no tiene datos de referidos, asi que se simula una cadena
+    de invitaciones: cada cliente (salvo los primeros "organicos") fue traido al
+    sistema por un cliente registrado antes que el. Esto crea "usuarios que
+    recomiendan a otros" (Req 5), sobre los que corre la consulta Cypher dedicada.
+    """
+    print("  Creando red de referidos (RECOMENDO)...")
+    cur.execute("SELECT id FROM users WHERE LOWER(rol::text) = 'cliente' ORDER BY id")
+    clientes = [row[0] for row in cur.fetchall()]
+    if len(clientes) < 2:
+        print("    Muy pocos clientes, se omite")
+        return
+
+    random.seed(42)  # reproducible entre corridas
+    organicos = 5    # los primeros 5 clientes no fueron referidos
+    total_refs = 0
+    for i, cliente_id in enumerate(clientes[organicos:], start=organicos):
+        # 70% de los clientes posteriores fueron referidos por uno anterior
+        if random.random() < 0.70:
+            referidor = random.choice(clientes[:i])
+            session.run("""
+                MATCH (a:Usuario {id: $ref}), (b:Usuario {id: $nuevo})
+                MERGE (a)-[:RECOMENDO]->(b)
+            """, ref=referidor, nuevo=cliente_id)
+            total_refs += 1
+    print(f"    {total_refs} relaciones RECOMENDO creadas")
+
 def imprimir_estadisticas(session):
     print("\n  Estadisticas del grafo:")
     for label in ["Usuario", "Restaurante", "Producto", "Pedido", "Zona"]:
         result = session.run(f"MATCH (n:{label}) RETURN count(n) AS cnt")
         print(f"    {label}: {result.single()['cnt']}")
-    for rel in ["REALIZO", "EN", "CONTIENE", "PERTENECE_A", "UBICADO_EN", "DISTANCIA_A"]:
+    for rel in ["REALIZO", "EN", "CONTIENE", "PERTENECE_A", "UBICADO_EN", "DISTANCIA_A", "RECOMENDO"]:
         result = session.run(f"MATCH ()-[r:{rel}]->() RETURN count(r) AS cnt")
         print(f"    :{rel}: {result.single()['cnt']}")
 
@@ -221,6 +261,7 @@ def main():
         cargar_restaurantes(session, cur)
         cargar_productos(session, cur)
         cargar_pedidos(session, cur)
+        crear_recomendaciones(session, cur)
         imprimir_estadisticas(session)
 
     driver.close()

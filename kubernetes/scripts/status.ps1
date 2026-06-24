@@ -10,7 +10,7 @@ if (-not (Get-Command kubectl -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-Write-Host "[1/9] Estado del cluster..." -ForegroundColor Yellow
+Write-Host "[1/10] Estado del cluster..." -ForegroundColor Yellow
 kubectl cluster-info --request-timeout=5s 2>&1 | Out-Null
 if ($LASTEXITCODE -eq 0) {
     Write-Host "  OK Kubernetes corriendo" -ForegroundColor Green
@@ -20,7 +20,7 @@ if ($LASTEXITCODE -eq 0) {
 }
 Write-Host ""
 
-Write-Host "[2/9] Namespace..." -ForegroundColor Yellow
+Write-Host "[2/10] Namespace..." -ForegroundColor Yellow
 $ns = kubectl get namespace reservainteligente --ignore-not-found=true 2>$null
 if ($ns) {
     Write-Host "  OK reservainteligente existe" -ForegroundColor Green
@@ -37,7 +37,7 @@ function Get-WorkloadStatus {
     return "OK"
 }
 
-Write-Host "[3/9] Stack operacional..." -ForegroundColor Yellow
+Write-Host "[3/10] Stack operacional..." -ForegroundColor Yellow
 $checks = @(
     @{kind="deployment"; name="main-api";       label="API"},
     @{kind="deployment"; name="search-service"; label="Search Service"},
@@ -59,14 +59,14 @@ foreach ($c in $checks) {
 }
 Write-Host ""
 
-Write-Host "[4/9] HDFS..." -ForegroundColor Yellow
+Write-Host "[4/10] HDFS..." -ForegroundColor Yellow
 $nnStatus = Get-WorkloadStatus -Kind statefulset -Name hdfs-namenode
 $dnStatus = Get-WorkloadStatus -Kind statefulset -Name hdfs-datanode
 if ($nnStatus -eq "OK") { Write-Host "  OK NameNode (RPC :8020, UI :9870)" -ForegroundColor Green } else { Write-Host "  X  NameNode" -ForegroundColor Red }
 if ($dnStatus -eq "OK") { Write-Host "  OK DataNode" -ForegroundColor Green } else { Write-Host "  X  DataNode" -ForegroundColor Red }
 Write-Host ""
 
-Write-Host "[5/9] Hive..." -ForegroundColor Yellow
+Write-Host "[5/10] Hive..." -ForegroundColor Yellow
 $msdbStatus = Get-WorkloadStatus -Kind statefulset -Name hive-metastore-db
 $msStatus   = Get-WorkloadStatus -Kind deployment  -Name hive-metastore
 $hs2Status  = Get-WorkloadStatus -Kind deployment  -Name hiveserver2
@@ -88,7 +88,7 @@ if ($hs2Status -eq "OK") {
 }
 Write-Host ""
 
-Write-Host "[6/9] Spark..." -ForegroundColor Yellow
+Write-Host "[6/10] Spark..." -ForegroundColor Yellow
 $smStatus = Get-WorkloadStatus -Kind deployment -Name spark-master
 $swStatus = Get-WorkloadStatus -Kind deployment -Name spark-worker
 if ($smStatus -eq "OK") { Write-Host "  OK Spark Master (:7077 cluster, :8080 UI)" -ForegroundColor Green } else { Write-Host "  X  Spark Master" -ForegroundColor Red }
@@ -108,7 +108,7 @@ if ($smStatus -eq "OK") {
 }
 Write-Host ""
 
-Write-Host "[7/9] Airflow..." -ForegroundColor Yellow
+Write-Host "[7/10] Airflow..." -ForegroundColor Yellow
 $apgStatus = Get-WorkloadStatus -Kind statefulset -Name airflow-postgres
 $aschStatus = Get-WorkloadStatus -Kind deployment  -Name airflow-scheduler
 $awebStatus = Get-WorkloadStatus -Kind deployment  -Name airflow-webserver
@@ -124,7 +124,7 @@ if ($initJobStatus -eq "1") {
 }
 Write-Host ""
 
-Write-Host "[8/9] Metabase..." -ForegroundColor Yellow
+Write-Host "[8/10] Metabase..." -ForegroundColor Yellow
 $mbStatus = Get-WorkloadStatus -Kind deployment -Name metabase
 if ($mbStatus -eq "OK") { Write-Host "  OK Metabase (:3000 UI)" -ForegroundColor Green } else { Write-Host "  X  Metabase" -ForegroundColor Red }
 
@@ -142,7 +142,28 @@ if ($mbStatus -eq "OK") {
 }
 Write-Host ""
 
-Write-Host "[9/9] Persistencia (PVC)..." -ForegroundColor Yellow
+Write-Host "[9/10] Neo4J (grafos)..." -ForegroundColor Yellow
+$neoStatus = Get-WorkloadStatus -Kind statefulset -Name neo4j
+if ($neoStatus -eq "OK") {
+    Write-Host "  OK Neo4J (:7474 Browser, :7687 Bolt)" -ForegroundColor Green
+    $neoAuthB64 = kubectl get secret neo4j-secret -n reservainteligente -o "jsonpath={.data.NEO4J_AUTH}" 2>$null
+    if (-not [string]::IsNullOrWhiteSpace($neoAuthB64)) {
+        $neoAuth  = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($neoAuthB64))
+        $neoParts = $neoAuth -split '/', 2
+        $cnt = kubectl exec -n reservainteligente neo4j-0 -c neo4j -- cypher-shell -u $neoParts[0] -p $neoParts[1] --format plain "MATCH (n) RETURN count(n);" 2>$null
+        $cntVal = ($cnt | Where-Object { $_ -match '^\d+$' } | Select-Object -First 1)
+        if ($cntVal -and [int]$cntVal -gt 0) {
+            Write-Host "  OK grafo cargado: $cntVal nodos" -ForegroundColor Green
+        } else {
+            Write-Host "  - grafo vacio (corre deploy-neo4j.ps1 para el seed)" -ForegroundColor DarkGray
+        }
+    }
+} else {
+    Write-Host "  X  Neo4J" -ForegroundColor Red
+}
+Write-Host ""
+
+Write-Host "[10/10] Persistencia (PVC)..." -ForegroundColor Yellow
 kubectl get pvc -n reservainteligente
 Write-Host ""
 
@@ -158,6 +179,7 @@ Write-Host "  HiveServer2 UI: kubectl port-forward svc/hiveserver2 10002:10002 -
 Write-Host "  Spark Master UI:kubectl port-forward svc/spark-master 8080:8080 -n reservainteligente" -ForegroundColor White
 Write-Host "  Airflow UI:     kubectl port-forward svc/airflow-webserver 8080:8080 -n reservainteligente" -ForegroundColor White
 Write-Host "  Metabase UI:    kubectl port-forward svc/metabase 3000:3000 -n reservainteligente" -ForegroundColor White
+Write-Host "  Neo4J Browser:  kubectl port-forward svc/neo4j-service 7474:7474 7687:7687 -n reservainteligente" -ForegroundColor White
 Write-Host ""
 Write-Host "Listo!" -ForegroundColor Green
 Write-Host ""

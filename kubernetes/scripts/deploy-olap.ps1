@@ -216,3 +216,13 @@ Write-Host "  Continuando con el despliegue de Metabase  " -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 & (Join-Path $scriptPath "deploy-metabase.ps1")
+
+# ── Neo4J ─────────────────────────────────────────────────────────────────────
+# Neo4J es la capa de analisis de grafos (Req 5 y 6): modela usuarios/productos/
+# pedidos + zonas, y carga el grafo desde PostgreSQL para co-compras,
+# recomendaciones y rutas de entrega. Se invoca el script dedicado.
+Write-Host "============================================" -ForegroundColor Cyan
+Write-Host "  Continuando con el despliegue de Neo4J     " -ForegroundColor Cyan
+Write-Host "============================================" -ForegroundColor Cyan
+Write-Host ""
+& (Join-Path $scriptPath "deploy-neo4j.ps1")

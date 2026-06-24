@@ -1,5 +1,5 @@
 # Dependencias para los scripts de Neo4J
 # Instalar con: pip install -r neo4j/requirements.txt
 
-neo4j==5.18.0          # Driver oficial de Neo4J para Python (conexion Bolt)
-psycopg2-binary==2.9.9 # Driver de PostgreSQL para leer los datos del sistema
+neo4j==5.18.0           # Driver oficial de Neo4J para Python (conexion Bolt)
+psycopg2-binary==2.9.10 # Driver de PostgreSQL (2.9.10 trae wheels para Python 3.13)

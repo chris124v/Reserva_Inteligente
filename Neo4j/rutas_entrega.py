@@ -11,7 +11,7 @@ de entrega para cada repartidor usando el algoritmo de vecino más cercano:
 
 Uso:
   # Con port-forward activo:
-  # kubectl port-forward svc/neo4j 7474:7474 7687:7687 -n reservainteligente
+  # kubectl port-forward svc/neo4j-service 7474:7474 7687:7687 -n reservainteligente
   pip install -r neo4j/requirements.txt
   python neo4j/rutas_entrega.py
 
@@ -20,38 +20,56 @@ Salida:
   También exporta el resultado a neo4j/rutas_resultado.json
 """
 
+import os
+import sys
 import json
 from neo4j import GraphDatabase
 
+# La consola de Windows usa cp1252 y no puede imprimir los caracteres de caja/emoji
+# del resumen. Forzamos UTF-8 en stdout para evitar UnicodeEncodeError.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 # ── Configuracion ─────────────────────────────────────────────────────────────
-NEO4J_URI      = "bolt://localhost:7687"
-NEO4J_USER     = "neo4j"
-NEO4J_PASSWORD = "Neo4jPass123!"
+# Credenciales por variable de entorno (no hardcodeadas). Para correr manual,
+# setear NEO4J_PASSWORD en el entorno. Host localhost porque se accede via
+# port-forward de Kubernetes.
+NEO4J_URI      = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_USER     = os.environ.get("NEO4J_USER", "neo4j")
+NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "neo4j")
 
 # Numero de repartidores disponibles
 NUM_REPARTIDORES = 2
 
-# ── Distancias entre zonas (mismas que en seed_neo4j.py) ─────────────────────
-DISTANCIAS = {
-    ("Calle Roma",    "Av Italia"):      2,
-    ("Calle Roma",    "Calle Falsa"):    3,
-    ("Calle Roma",    "Muelle"):         8,
-    ("Calle Roma",    "Boulevard"):      5,
-    ("Calle Roma",    "Av Gol"):         4,
-    ("Calle Roma",    "Plaza Central"):  1,
-    ("Av Italia",     "Calle Falsa"):    2,
-    ("Av Italia",     "Muelle"):         7,
-    ("Av Italia",     "Boulevard"):      4,
-    ("Calle Falsa",   "Muelle"):         6,
-    ("Calle Falsa",   "Av Gol"):         3,
-    ("Muelle",        "Boulevard"):      4,
-    ("Boulevard",     "Av Gol"):         2,
-    ("Av Gol",        "Plaza Central"):  3,
-    ("Plaza Central", "Calle Falsa"):    2,
-}
+# Matriz de distancias entre zonas. Se llena en runtime desde el grafo de Neo4J
+# (cargar_matriz_distancias) usando shortestPath sobre las relaciones DISTANCIA_A,
+# asi se obtiene la distancia minima real entre CUALQUIER par de zonas (incluso
+# las que no tienen arista directa, via caminos multi-salto) y no se duplica la
+# data hardcodeada de seed_neo4j.py. Cumple el Req 6 ("consultas en Neo4J para
+# encontrar caminos optimos").
+DISTANCIAS = {}
+
+def cargar_matriz_distancias(session):
+    """
+    Calcula la distancia minima en km entre todos los pares de zonas usando
+    shortestPath sobre las relaciones DISTANCIA_A del grafo, y la guarda en el
+    diccionario global DISTANCIAS.
+    """
+    result = session.run("""
+        MATCH (a:Zona), (b:Zona)
+        WHERE a.nombre < b.nombre
+        MATCH p = shortestPath((a)-[:DISTANCIA_A*]-(b))
+        RETURN a.nombre AS za, b.nombre AS zb,
+               reduce(s = 0, r IN relationships(p) | s + r.km) AS km
+    """)
+    for row in result:
+        DISTANCIAS[(row["za"], row["zb"])] = row["km"]
+    print(f"  Matriz de distancias cargada del grafo: {len(DISTANCIAS)} pares de zonas")
 
 def distancia(zona_a, zona_b):
-    """Devuelve la distancia en km entre dos zonas. 999 si no hay conexion directa."""
+    """Distancia minima en km entre dos zonas (de la matriz cargada del grafo)."""
     if zona_a == zona_b:
         return 0
     return DISTANCIAS.get((zona_a, zona_b),
@@ -95,10 +113,17 @@ def vecino_mas_cercano(zona_inicio, pedidos):
 # ── Consulta de pedidos pendientes desde Neo4J ───────────────────────────────
 
 def obtener_pedidos_pendientes(session):
-    """Lee los pedidos a domicilio pendientes desde Neo4J."""
+    """
+    Lee los pedidos a domicilio PENDIENTES de entrega desde Neo4J.
+
+    Solo estados aun no finalizados (pendiente, confirmado, en_preparacion, listo);
+    se excluyen 'entregado' y 'cancelado' — no tiene sentido rutear un pedido ya
+    entregado o cancelado. Se usa toUpper() para ser robusto al case del estado.
+    """
     result = session.run("""
         MATCH (u:Usuario)-[:REALIZO]->(o:Pedido)-[:EN]->(r:Restaurante)
         WHERE toUpper(o.tipo_entrega) = 'DOMICILIO'
+          AND toUpper(o.estado) IN ['PENDIENTE', 'CONFIRMADO', 'EN_PREPARACION', 'LISTO']
         RETURN o.id          AS pedido_id,
                u.nombre      AS cliente,
                o.zona_entrega AS zona_entrega,
@@ -180,6 +205,8 @@ def main():
     driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
     with driver.session() as session:
+        print("Cargando matriz de distancias del grafo...")
+        cargar_matriz_distancias(session)
         print("Obteniendo pedidos pendientes...")
         pedidos = obtener_pedidos_pendientes(session)
 
@@ -211,8 +238,8 @@ def main():
     # Imprimir resultado
     imprimir_rutas(rutas_por_repartidor)
 
-    # Exportar a JSON
-    output_path = "neo4j/rutas_resultado.json"
+    # Exportar a JSON (junto al script, sin depender del directorio actual)
+    output_path = os.path.join(os.path.dirname(__file__), "rutas_resultado.json")
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(rutas_por_repartidor, f, ensure_ascii=False, indent=2)
     print(f"\n📄 Resultado exportado a {output_path}")

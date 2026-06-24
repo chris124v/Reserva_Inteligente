@@ -77,9 +77,10 @@ Stop-Workload -Kind statefulset -Name airflow-postgres
 Write-Host "OK Airflow detenido" -ForegroundColor Green
 Write-Host ""
 
-Write-Host "[5/7] Deteniendo Metabase..." -ForegroundColor Yellow
+Write-Host "[5/7] Deteniendo Metabase y Neo4J..." -ForegroundColor Yellow
 Stop-Workload -Kind deployment -Name metabase
-Write-Host "OK Metabase detenido" -ForegroundColor Green
+Stop-Workload -Kind statefulset -Name neo4j
+Write-Host "OK Metabase y Neo4J detenidos" -ForegroundColor Green
 Write-Host ""
 
 Write-Host "[6/7] Limpiando jobs de inicializacion..." -ForegroundColor Yellow

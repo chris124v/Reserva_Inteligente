@@ -51,7 +51,7 @@ Tambien se puede correr cada capa por separado:
 .\deploy-metabase.ps1
 ```
 
-Detalle de verificacion, logs y port-forwards de cada componente en las secciones 15 a 20 de este documento.
+Detalle de verificacion, logs y port-forwards de cada componente en las secciones 15 a 21 de este documento.
 
 ---
 
@@ -657,3 +657,103 @@ Datos para conectar la base de datos en el wizard de Metabase:
 - Base de datos: `restaurantes_db`
 - Usuario: `postgres`
 - Tablas a usar en los dashboards: `analytics_ingresos_mes_categoria`, `analytics_actividad_zona`, `analytics_pedidos_estado`
+
+---
+
+## 21. Neo4J (Grafos)
+
+Neo4J almacena el grafo de relaciones del sistema: usuarios, restaurantes, productos, pedidos y zonas geograficas.
+Se usa para consultas de co-compras, usuarios influyentes, red de referidos y optimizacion de rutas de entrega.
+
+### Desplegar / redesplegar Neo4J
+
+El script aplica los manifiestos, espera que el pod este listo, extrae credenciales de los Secrets de Kubernetes y ejecuta el seed automaticamente.
+
+```powershell
+.\deploy-neo4j.ps1
+```
+
+Tambien se invoca como ultimo paso de `deploy-olap.ps1`.
+
+Prerequisito: tener el archivo `kubernetes/databases/Neo4j/secret.yaml` creado localmente (esta en `.gitignore`). Ver `secret.example.yaml` como plantilla.
+
+### Estado del pod
+
+```powershell
+kubectl get pods -n reservainteligente -l app=neo4j
+kubectl get statefulset neo4j -n reservainteligente
+```
+
+### Logs
+
+```powershell
+kubectl logs -n reservainteligente neo4j-0 --tail=50
+kubectl logs -n reservainteligente neo4j-0 -c prepare-conf-and-data --tail=30  # initContainer
+```
+
+### Port-forward y Neo4J Browser
+
+```powershell
+kubectl port-forward svc/neo4j-service 7474:7474 7687:7687 -n reservainteligente
+# http://localhost:7474  (usuario: neo4j, clave: en secret.yaml)
+```
+
+### Verificar grafo con cypher-shell
+
+```powershell
+kubectl exec -it neo4j-0 -n reservainteligente -- cypher-shell -u neo4j -p Neo4jPass123! "MATCH (n) RETURN labels(n)[0] AS tipo, count(n) AS total ORDER BY total DESC;"
+```
+
+Nodos esperados tras el seed: ~566 (39 Usuario, 20 Restaurante, 300 Producto, 200 Pedido, 7 Zona).
+
+### Seed manual (si se necesita recargar el grafo)
+
+```powershell
+# Con port-forwards activos (neo4j-service :7687, postgres-service :5432):
+kubectl port-forward svc/neo4j-service 7687:7687 -n reservainteligente &
+kubectl port-forward svc/postgres-service 5432:5432 -n reservainteligente &
+
+$env:NEO4J_PASSWORD = "Neo4jPass123!"
+$env:PG_PASSWORD    = "<clave de postgres>"
+pip install -r Neo4j\neo4j-requirements.txt
+python Neo4j\seed_neo4j.py
+```
+
+### Consultas Cypher (co-compras, recomendaciones, rutas)
+
+Las queries de demostracion estan en `Neo4j\queries.cypher`. Abrirlas con el Neo4J Browser en `http://localhost:7474` o ejecutarlas con `cypher-shell`.
+
+Consultas incluidas:
+
+1. Productos co-comprados con frecuencia
+2. Usuarios mas influyentes (mas pedidos realizados)
+3. Usuarios que recomendaron a otros (`RECOMENDO` directos)
+4. Cadena de alcance por referidos (`RECOMENDO*1..`)
+5. Camino mas corto entre dos zonas (`shortestPath`)
+6. Todas las rutas desde una zona
+7. Cola de pedidos pendientes a domicilio
+8. Pedidos por restaurante
+9. Productos mas pedidos globalmente
+
+### Simular rutas de entrega (vecino mas cercano)
+
+```powershell
+kubectl port-forward svc/neo4j-service 7687:7687 -n reservainteligente
+$env:NEO4J_PASSWORD = "Neo4jPass123!"
+python Neo4j\rutas_entrega.py
+```
+
+Genera `Neo4j\rutas_resultado.json` con el orden optimo de entregas por repartidor. La matriz de distancias se carga del grafo via `shortestPath` (no hardcodeada).
+
+### Limpiar Neo4J
+
+`cleanup-all.ps1` ya incluye Neo4J (escala el StatefulSet a 0). Para borrarlo manualmente:
+
+```powershell
+kubectl scale statefulset/neo4j --replicas=0 -n reservainteligente
+kubectl delete statefulset/neo4j -n reservainteligente
+kubectl delete svc/neo4j-service -n reservainteligente
+kubectl delete configmap/neo4j-config -n reservainteligente
+kubectl delete secret/neo4j-secret -n reservainteligente
+kubectl delete pvc/neo4j-storage-neo4j-0 -n reservainteligente
+```

@@ -38,6 +38,39 @@ spec:
       labels:
         app: neo4j
     spec:
+      # Corre como el usuario neo4j (uid/gid 7474) en lugar de root. Asi el
+      # entrypoint NO intenta hacer chown del conf montado desde el ConfigMap
+      # (read-only) — ese chown fallaba con "Read-only file system" y crasheaba
+      # el pod. fsGroup deja el volumen /data escribible por el grupo neo4j.
+      securityContext:
+        runAsUser: 7474
+        runAsGroup: 7474
+        fsGroup: 7474
+      # Init (como root) que prepara permisos y un conf ESCRIBIBLE:
+      #  - /data es un hostPath de root; fsGroup no alcanza, asi que se le hace chown.
+      #  - El conf no puede venir read-only del ConfigMap: el entrypoint de Neo4J le
+      #    APPENDea settings de APOC al arrancar y un montaje read-only da
+      #    "Permission denied". Por eso se copian los conf por defecto del image +
+      #    nuestro neo4j.conf a un emptyDir escribible, propiedad de 7474.
+      initContainers:
+        - name: prepare-conf-and-data
+          image: neo4j:5.18-community
+          command:
+            - sh
+            - -c
+            - |
+              cp -rn /var/lib/neo4j/conf/. /writable-conf/ 2>/dev/null || true
+              cp /config-template/neo4j.conf /writable-conf/neo4j.conf
+              chown -R 7474:7474 /writable-conf /data
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: conf-writable
+              mountPath: /writable-conf
+            - name: neo4j-config
+              mountPath: /config-template
+            - name: neo4j-storage
+              mountPath: /data
       containers:
         - name: neo4j
           image: neo4j:5.18-community
@@ -47,21 +80,24 @@ spec:
             - containerPort: 7687
               name: bolt
           env:
-            # Solo se define la autenticacion como variable de entorno
-            # El resto de la configuracion viene del ConfigMap montado como archivo
+            # Autenticacion desde el Secret (neo4j-secret), no hardcodeada.
+            # El resto de la configuracion viene del conf preparado por el init.
             - name: NEO4J_AUTH
-              value: "neo4j/Neo4jPass123!"
+              valueFrom:
+                secretKeyRef:
+                  name: neo4j-secret
+                  key: NEO4J_AUTH
             # Plugin APOC para algoritmos de grafos
             - name: NEO4J_PLUGINS
               value: '["apoc"]'
           volumeMounts:
             - name: neo4j-storage
               mountPath: /data
-            # Monta el ConfigMap como archivo de configuracion
-            # Esto evita que Neo4J lea las variables de entorno de Kubernetes
-            - name: neo4j-config
-              mountPath: /var/lib/neo4j/conf/neo4j.conf
-              subPath: neo4j.conf
+            # Carpeta de conf ESCRIBIBLE (emptyDir) preparada por el initContainer.
+            # Lleva los defaults del image + nuestro neo4j.conf, asi APOC puede
+            # appendear sus settings sin chocar con un montaje read-only.
+            - name: conf-writable
+              mountPath: /var/lib/neo4j/conf
           resources:
             requests:
               cpu: 200m
@@ -73,6 +109,8 @@ spec:
         - name: neo4j-config
           configMap:
             name: neo4j-config
+        - name: conf-writable
+          emptyDir: {}
   volumeClaimTemplates:
     - metadata:
         name: neo4j-storage
