@@ -17,7 +17,7 @@ En este proyecto se realiza un sistema de backend complejo que integra CI/CD, mo
 
 En este link estaria todo, el video, el pdf y todo el codigo.
 
-[Video demostrativo en Google Drive](https://drive.google.com/drive/folders/1J_ET9XwiZcyDbQ3yPgwX-SdUKT5qofYV?usp=sharing)
+[Video demostrativo en Google Drive](https://drive.google.com/drive/folders/1JhWkfgqhB1LY0vh_wJm4GzSwQ3yHh7LF?usp=sharing)
 
 ---
 
@@ -364,8 +364,6 @@ Este paso despliega el stack de análisis de datos: HDFS, Hive, Spark y Airflow.
 ```powershell
 cd kubernetes\scripts
 .\deploy-olap.ps1
-.\deploy-airflow.ps1
-.\deploy-metabase.ps1
 ```
 
 ### Port-forwards necesarios para OLAP
