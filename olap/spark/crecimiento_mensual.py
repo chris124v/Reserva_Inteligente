@@ -45,7 +45,7 @@ pedidos_mes = (
 
 pedidos_mes.createOrReplaceTempView("pedidos_por_mes")
 
-# --- análisis con SparkSQL: agregación mensual + LAG para crecimiento MoM -
+# --- análisis con SparkSQL: agregación mensual + LAG para crecimiento MoM 
 totales = spark.sql("""
     SELECT
         anio,

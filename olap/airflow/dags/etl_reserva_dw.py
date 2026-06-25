@@ -2,13 +2,13 @@
 etl_reserva_dw.py
 ------------------
 DAG diario que orquesta: transformación con Spark + carga al Data Warehouse
-(Hive) -> análisis OLAP con Spark -> materialización para Metabase ->
+(Hive) -> análisis OLAP con Spark -> materialización para Metabase
 verificación de cambios en el catálogo de menús -> reindexado condicional de
 Elasticsearch.
 
 cargar_dw_hive             corre etl_dimensiones_hechos.py con spark-submit local[*]
 analisis_tendencias_consumo \
-analisis_horarios_pico       > los 3 análisis Spark obligatorios (Req 2); leen de
+analisis_horarios_pico       > los 3 análisis Spark; leen de
 analisis_crecimiento_mensual /  PostgreSQL operacional y escriben tablas analytics_*
 materializar_vistas_metabase  materializa las 3 vistas Hive a tablas analytics_*
 verificar_cambio_catalogo  compara MAX(fecha_actualizacion) de menus contra la
@@ -16,10 +16,6 @@ verificar_cambio_catalogo  compara MAX(fecha_actualizacion) de menus contra la
                            hace short-circuit y se saltan las tareas siguientes
 reindexar_elasticsearch    POST a search-service/search/reindex
 
-Nota de diseño: todas las tareas spark-submit se encadenan en SERIE (no en
-paralelo) a propósito. El cluster es de un solo nodo y con todo el stack OLAP
-arriba la CPU queda al límite; dos spark-submit simultáneos se quedarían sin
-recursos. Correr uno a la vez es más lento pero confiable.
 """
 
 from datetime import datetime, timedelta

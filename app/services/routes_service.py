@@ -7,30 +7,31 @@ Lee los pedidos a domicilio desde Neo4J y calcula el orden optimo
 de entrega para cada repartidor usando el algoritmo de vecino mas cercano.
 """
 
-import random
 from app.database.neo4j import get_neo4j_driver
 
-# Distancias en km entre zonas del sistema
-DISTANCIAS = {
-    ("Calle Roma",    "Av Italia"):      2,
-    ("Calle Roma",    "Calle Falsa"):    3,
-    ("Calle Roma",    "Muelle"):         8,
-    ("Calle Roma",    "Boulevard"):      5,
-    ("Calle Roma",    "Av Gol"):         4,
-    ("Calle Roma",    "Plaza Central"):  1,
-    ("Av Italia",     "Calle Falsa"):    2,
-    ("Av Italia",     "Muelle"):         7,
-    ("Av Italia",     "Boulevard"):      4,
-    ("Calle Falsa",   "Muelle"):         6,
-    ("Calle Falsa",   "Av Gol"):         3,
-    ("Muelle",        "Boulevard"):      4,
-    ("Boulevard",     "Av Gol"):         2,
-    ("Av Gol",        "Plaza Central"):  3,
-    ("Plaza Central", "Calle Falsa"):    2,
-}
+# Matriz de distancias entre zonas. Se llena en runtime desde el grafo de Neo4J
+# (cargar_matriz_distancias) usando shortestPath sobre las relaciones DISTANCIA_A,
+# asi se obtiene la distancia minima real entre cualquier par de zonas (incluso
+# las que no tienen arista directa, via caminos multi-salto) en vez de un
+# diccionario fijo e incompleto.
+DISTANCIAS: dict[tuple[str, str], int] = {}
+
+def cargar_matriz_distancias() -> None:
+    """Calcula la distancia minima en km entre todos los pares de zonas con shortestPath."""
+    driver = get_neo4j_driver()
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (a:Zona), (b:Zona)
+            WHERE a.nombre < b.nombre
+            MATCH p = shortestPath((a)-[:DISTANCIA_A*]-(b))
+            RETURN a.nombre AS za, b.nombre AS zb,
+                   reduce(s = 0, r IN relationships(p) | s + r.km) AS km
+        """)
+        for row in result:
+            DISTANCIAS[(row["za"], row["zb"])] = row["km"]
 
 def distancia_entre_zonas(zona_a: str, zona_b: str) -> int:
-    """Devuelve la distancia en km entre dos zonas. 999 si no hay conexion directa."""
+    """Devuelve la distancia minima en km entre dos zonas (de la matriz cargada del grafo)."""
     if zona_a == zona_b:
         return 0
     return DISTANCIAS.get((zona_a, zona_b),
@@ -68,12 +69,18 @@ def vecino_mas_cercano(zona_inicio: str, pedidos: list[dict]) -> tuple[list[dict
     return ruta, km_total
 
 def obtener_pedidos_pendientes() -> list[dict]:
-    """Lee los pedidos a domicilio desde Neo4J."""
+    """Lee los pedidos a domicilio PENDIENTES de entrega desde Neo4J.
+
+    Solo estados aun no finalizados (pendiente, confirmado, en_preparacion, listo);
+    se excluyen 'entregado' y 'cancelado' porque no tiene sentido rutear un pedido
+    que ya se entrego o que se cancelo.
+    """
     driver = get_neo4j_driver()
     with driver.session() as session:
         result = session.run("""
             MATCH (u:Usuario)-[:REALIZO]->(o:Pedido)-[:EN]->(r:Restaurante)
             WHERE toUpper(o.tipo_entrega) = 'DOMICILIO'
+              AND toUpper(o.estado) IN ['PENDIENTE', 'CONFIRMADO', 'EN_PREPARACION', 'LISTO']
             RETURN o.id            AS pedido_id,
                    u.nombre        AS cliente,
                    o.zona_entrega  AS zona_entrega,
@@ -95,6 +102,7 @@ def calcular_rutas(num_repartidores: int = 2) -> dict:
     Retorna:
       dict con las rutas por repartidor y estadisticas
     """
+    cargar_matriz_distancias()
     pedidos = obtener_pedidos_pendientes()
 
     if not pedidos:

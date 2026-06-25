@@ -22,6 +22,13 @@ data:
   # timeout de 120s del propio healthcheck de Airflow y el container se reinicia
   # en bucle. 2 workers alcanza para este volumen de uso y arranca mas rapido.
   AIRFLOW__WEBSERVER__WORKERS: "2"
+  # Default de Airflow recicla 1 worker cada 30s (worker_refresh_interval). Con
+  # solo 2 workers eso tumba el 50% de la capacidad por ciclo, y en este nodo
+  # cargado el respawn no siempre alcanza a tiempo: quedan ventanas de "0
+  # workers vivos" que dan connection refused / timeouts intermitentes en la
+  # API REST (visto en validate_airflow.py). Subir el intervalo a 30 min evita
+  # el reciclaje durante una sesion de grabacion o de validacion.
+  AIRFLOW__WEBSERVER__WORKER_REFRESH_INTERVAL: "1800"
 
   # Connection HTTP hacia search-service, sin credenciales
   AIRFLOW_CONN_SEARCH_SERVICE: "http://search-service"
