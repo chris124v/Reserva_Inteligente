@@ -47,8 +47,7 @@ NUM_REPARTIDORES = 2
 # (cargar_matriz_distancias) usando shortestPath sobre las relaciones DISTANCIA_A,
 # asi se obtiene la distancia minima real entre CUALQUIER par de zonas (incluso
 # las que no tienen arista directa, via caminos multi-salto) y no se duplica la
-# data hardcodeada de seed_neo4j.py. Cumple el Req 6 ("consultas en Neo4J para
-# encontrar caminos optimos").
+# data hardcodeada de seed_neo4j.py. 
 DISTANCIAS = {}
 
 def cargar_matriz_distancias(session):

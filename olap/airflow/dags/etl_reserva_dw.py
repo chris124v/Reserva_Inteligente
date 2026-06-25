@@ -1,6 +1,6 @@
 """
 etl_reserva_dw.py
-------------------
+
 DAG diario que orquesta: transformación con Spark + carga al Data Warehouse
 (Hive) -> análisis OLAP con Spark -> materialización para Metabase
 verificación de cambios en el catálogo de menús -> reindexado condicional de
@@ -88,7 +88,7 @@ with DAG(
 
     cargar_dw_hive = _spark_submit("cargar_dw_hive", "etl_dimensiones_hechos.py")
 
-    # Los 3 análisis Spark obligatorios (Req 2). Leen de PostgreSQL operacional y
+    # Leen de PostgreSQL operacional y
     # escriben las tablas analytics_tendencias_consumo / analytics_horarios_pico /
     # analytics_crecimiento_mensual. Al correr en el DAG quedan siempre en sync con
     # el seed actual (antes solo se generaban a mano y se desactualizaban).
@@ -113,7 +113,7 @@ with DAG(
         python_callable=_reindexar_elasticsearch,
     )
 
-    # Cadena lineal: todos los spark-submit corren de a uno (ver nota de diseño).
+    # Cadena lineal: todos los spark-submit corren de a uno.
     (
         cargar_dw_hive
         >> analisis_tendencias_consumo
