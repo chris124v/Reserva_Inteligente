@@ -49,9 +49,10 @@ algo cargue:
 > completa del sistema. Tenemos una capa operacional en PostgreSQL que sirve
 > los datos de usuarios, restaurantes, menus, pedidos y reservas. Sobre esa
 > capa corre un pipeline batch diario orquestado por **Apache Airflow**, que
-> dispara **Apache Spark** para transformar esos datos con DataFrames y
-> SparkSQL, y los carga en un **Data Warehouse** implementado con **Apache
-> Hive sobre HDFS**, siguiendo un esquema estrella de Kimball.
+> dispara **Apache Spark** dos veces, con dos propositos distintos: primero
+> para construir el **Data Warehouse** en **Apache Hive sobre HDFS**, con un
+> esquema estrella de Kimball, y luego para calcular 3 analisis de negocio
+> obligatorios. Esto lo vamos a detallar en un momento.
 >
 > Esos resultados se materializan de vuelta en PostgreSQL para que
 > **Metabase** los consuma de forma nativa y arme los dashboards. En paralelo,
@@ -65,17 +66,24 @@ algo cargue:
 
 ---
 
-## 01:30 – 02:30 (1:00) — Req 1: Arquitectura OLAP y Almacen de Datos (Chris)
+## 01:30 – 02:45 (1:15) — Req 1: Arquitectura OLAP y Almacen de Datos (Chris)
 
 **Mostrar en pantalla:** `olap/hive/schema_estrella.hql` (scroll rapido) y la terminal.
 
 **Guion:**
 
 > "El primer requerimiento pide un esquema estrella en un Data Warehouse open
-> source. Implementamos esto con Apache Hive sobre HDFS: 5 tablas de
-> dimension — tiempo, usuario, restaurante, producto y ubicacion — y 2 tablas
-> de hechos, particionadas por año y mes: `fact_pedidos` y `fact_reservas`.
-> Sobre esas tablas construimos 7 vistas OLAP para los analisis agregados."
+> source. Implementamos esto con Apache Hive sobre HDFS, siguiendo el modelo
+> de Kimball: 5 tablas de dimension — tiempo, usuario, restaurante, producto
+> y ubicacion — que ya vienen desnormalizadas, es decir, sin necesidad de
+> hacer JOINs para leer atributos descriptivos como el nombre de un
+> restaurante o la categoria de un producto. Y 2 tablas de hechos,
+> `fact_pedidos` y `fact_reservas`, que solo guardan las metricas numericas
+> — totales, cantidades, estados — con referencias hacia esas dimensiones, y
+> estan particionadas por año y mes para que las consultas analiticas solo
+> lean el pedazo de datos que necesitan, en vez de escanear todo el
+> historico. Sobre esas tablas construimos 7 vistas OLAP para los analisis
+> agregados."
 
 **Comando (terminal con port-forward de HiveServer2 ya activo):**
 
@@ -88,18 +96,27 @@ kubectl exec -n reservainteligente deploy/hiveserver2 -- /opt/hive/bin/hive -e "
 
 ---
 
-## 02:30 – 03:30 (1:00) — Req 2: Procesamiento con Apache Spark (Chris)
+## 02:45 – 04:00 (1:15) — Req 2: Procesamiento con Apache Spark (Chris)
 
 **Mostrar en pantalla:** `olap/spark/crecimiento_mensual.py` (la parte del `LAG()`).
 
 **Guion:**
 
 > "El segundo requerimiento pide procesar los datos con Spark DataFrames y
-> SparkSQL, con 3 analisis obligatorios: tendencias de consumo, horarios pico
-> y crecimiento mensual. Los 3 leen directo de PostgreSQL operacional y
-> escriben sus resultados en tablas `analytics_*`. El de crecimiento mensual
-> usa una Window Function `LAG()` para calcular el porcentaje de variacion
-> mes a mes sin necesidad de self-joins."
+> SparkSQL. Como dije, Spark se usa dos veces con dos propositos distintos.
+> Primero, para construir el esquema estrella que acabamos de ver: lee de
+> PostgreSQL, desnormaliza y le da forma a los datos para que encajen en
+> Hive — ahi no calcula ningun resultado de negocio, solo transforma.
+>
+> Y por separado, en 3 scripts independientes, hace los 3 analisis
+> obligatorios que el requerimiento pide y que si calculan algo:
+> `tendencias_consumo` agrupa los items de cada pedido por mes y categoria,
+> para saber que se vende mas y cuando. `horarios_pico` junta pedidos y
+> reservas para encontrar las horas y dias con mas actividad. Y
+> `crecimiento_mensual` usa una Window Function `LAG()` para comparar cada
+> mes contra el mes inmediatamente anterior y calcular el porcentaje de
+> crecimiento, sin necesidad de self-joins. Estos 3 escriben directo a
+> PostgreSQL, sin pasar por Hive en ningun momento."
 
 **Comando (terminal con port-forward de Postgres activo):**
 
@@ -113,7 +130,7 @@ kubectl exec -n reservainteligente postgres-0 -- psql -U postgres -d restaurante
 
 ---
 
-## 03:30 – 04:45 (1:15) — Req 3: Visualizacion de Datos con Metabase (Chris)
+## 04:00 – 05:15 (1:15) — Req 3: Visualizacion de Datos con Metabase (Chris)
 
 **Mostrar en pantalla:** Metabase en el navegador, los 3 dashboards.
 
@@ -135,7 +152,7 @@ kubectl exec -n reservainteligente postgres-0 -- psql -U postgres -d restaurante
 
 ---
 
-## 04:45 – 06:15 (1:30) — Req 4: Orquestacion con Apache Airflow (Chris)
+## 05:15 – 06:45 (1:30) — Req 4: Orquestacion con Apache Airflow (Chris)
 
 **Mostrar en pantalla:** Airflow UI, vista Graph del DAG `etl_reserva_dw`.
 
@@ -171,7 +188,7 @@ kubectl exec -n reservainteligente deploy/airflow-scheduler -- airflow dags list
 
 ---
 
-## 06:15 – 08:15 (2:00) — Req 5: Neo4J para Analisis de Grafos y Rutas (Espi)
+## 06:45 – 08:45 (2:00) — Req 5: Neo4J para Analisis de Grafos y Rutas (Espi)
 
 **Mostrar en pantalla:** Neo4J Browser.
 
@@ -235,7 +252,7 @@ RETURN [n IN nodes(path) | n.nombre] AS ruta,
 
 ---
 
-## 08:15 – 09:30 (1:15) — Req 6: Asignacion de Rutas de Entrega (Espi)
+## 08:45 – 09:45 (1:00) — Req 6: Asignacion de Rutas de Entrega (Espi)
 
 **Mostrar en pantalla:** terminal con `curl`, o Postman/navegador.
 
@@ -261,7 +278,7 @@ curl "http://localhost:8000/routes/delivery?repartidores=2"
 
 ---
 
-## 09:30 – 11:00 (1:30) — Pruebas y Validaciones
+## 09:45 – 11:00 (1:15) — Pruebas y Validaciones
 
 **Mostrar en pantalla:** terminal corriendo `validate_all.py`.
 
@@ -312,13 +329,13 @@ python validate_all.py
 | Segmento | Inicio | Duracion | Fin |
 |---|---|---|---|
 | Intro + Arquitectura | 00:00 | 1:30 | 01:30 |
-| Req 1 — OLAP/Hive | 01:30 | 1:00 | 02:30 |
-| Req 2 — Spark | 02:30 | 1:00 | 03:30 |
-| Req 3 — Metabase | 03:30 | 1:15 | 04:45 |
-| Req 4 — Airflow | 04:45 | 1:30 | 06:15 |
-| Req 5 — Neo4J | 06:15 | 2:00 | 08:15 |
-| Req 6 — Rutas de entrega | 08:15 | 1:15 | 09:30 |
-| Pruebas y Validaciones | 09:30 | 1:30 | 11:00 |
+| Req 1 — OLAP/Hive | 01:30 | 1:15 | 02:45 |
+| Req 2 — Spark | 02:45 | 1:15 | 04:00 |
+| Req 3 — Metabase | 04:00 | 1:15 | 05:15 |
+| Req 4 — Airflow | 05:15 | 1:30 | 06:45 |
+| Req 5 — Neo4J | 06:45 | 2:00 | 08:45 |
+| Req 6 — Rutas de entrega | 08:45 | 1:00 | 09:45 |
+| Pruebas y Validaciones | 09:45 | 1:15 | 11:00 |
 | Cierre | 11:00 | 1:00 | 12:00 |
 
 **Recomendacion:** cronometrarse leyendo el guion en voz alta una vez sin
