@@ -26,6 +26,18 @@ spec:
                 name: airflow-config
             - secretRef:
                 name: airflow-secret
+          # Tuning para nodo con poca RAM: 1 solo worker gunicorn, sin el refresh
+          # periodico que recicla workers (causa "Parent changed, shutting down" y
+          # mata el webserver), y timeout amplio para arranques lentos.
+          env:
+            - name: AIRFLOW__WEBSERVER__WORKERS
+              value: "1"
+            - name: AIRFLOW__WEBSERVER__WORKER_REFRESH_BATCH_SIZE
+              value: "0"
+            - name: AIRFLOW__WEBSERVER__WORKER_REFRESH_INTERVAL
+              value: "0"
+            - name: AIRFLOW__WEBSERVER__WEB_SERVER_WORKER_TIMEOUT
+              value: "300"
           resources:
             requests:
               memory: "512Mi"

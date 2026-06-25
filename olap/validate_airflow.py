@@ -42,7 +42,9 @@ except Exception:
 AIRFLOW_HOST = os.environ.get("AIRFLOW_HOST", "localhost")
 AIRFLOW_PORT = os.environ.get("AIRFLOW_PORT", "8080")
 AIRFLOW_USER = os.environ.get("AIRFLOW_USER", "admin")
-AIRFLOW_PASS = os.environ.get("AIRFLOW_PASS", "admin")
+# Default = admin creado por airflow-init-job (ver kubernetes/olap/airflow/airflow-secret.yaml).
+# Se puede sobreescribir con la env var AIRFLOW_PASS si se cambia la clave del secret.
+AIRFLOW_PASS = os.environ.get("AIRFLOW_PASS", "ReservaAdmin2026!")
 AIRFLOW_BASE = f"http://{AIRFLOW_HOST}:{AIRFLOW_PORT}/api/v1"
 
 PG_HOST     = os.environ.get("PG_HOST",     "localhost")
