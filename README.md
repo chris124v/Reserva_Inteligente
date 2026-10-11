@@ -1,4 +1,5 @@
 <h1 align="center">SmartReserve</h1>
+<p align="center"><img src="docs/images/smartreserve-logo.png" alt="SmartReserve logo" width="50%"></p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/PYTHON-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11">
